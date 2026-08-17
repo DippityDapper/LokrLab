@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>LokrLab</AssemblyName>
+    <RootNamespace>LokrLab</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Private=false — see the identical note in LokrEncyclopedia.csproj: these are deployed
+         separately and must not be duplicated into this plugin's own folder. -->
+    <ProjectReference Include="..\LokrLabApi\LokrLabApi.csproj" Private="false" />
+    <ProjectReference Include="..\LokrModMenu\LokrModMenu.csproj" Private="false" />
+    <ProjectReference Include="..\LokrModAPI\LokrModAPI.csproj" Private="false" />
+    <ProjectReference Include="..\LokrCharacterLoader\LokrCharacterLoader.csproj" Private="false" />
+    <ProjectReference Include="..\SimpleUI\SimpleUI.csproj" Private="false" />
+  </ItemGroup>
+
+  <Target Name="RemoveRetiredLabPlugins" AfterTargets="DeployToBepInEx">
+    <RemoveDir Directories="$(GameDir)\BepInEx\plugins\LokrCharacterLab" />
+    <RemoveDir Directories="$(GameDir)\BepInEx\plugins\LokrAbilityLab" />
+  </Target>
+
+</Project>

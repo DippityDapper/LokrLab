@@ -1,0 +1,2 @@
+"SKILL_placeholder_attack_NAME" = "Placeholder Attack"
+"SKILL_placeholder_attack_DESCRIPTION" = "A placeholder basic attack."

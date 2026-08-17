@@ -1,0 +1,13 @@
+"placeholder_passive_3"
+{
+	"AbilityBehavior"	"PASSIVE"
+	"Icon"	"BasicSword"
+
+	"Modifiers"
+	{
+		"placeholder_passive_3_modifier"
+		{
+			"Passive"	"1"
+		}
+	}
+}

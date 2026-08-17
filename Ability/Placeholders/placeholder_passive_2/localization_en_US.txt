@@ -1,0 +1,2 @@
+"SKILL_placeholder_passive_2_NAME" = "Placeholder Passive 2"
+"SKILL_placeholder_passive_2_DESCRIPTION" = "A placeholder passive trait."

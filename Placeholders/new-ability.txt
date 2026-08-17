@@ -1,0 +1,29 @@
+"__ABILITY_ID__"
+{
+	"AbilityBehavior"	"UNIT_TARGET"
+	"AbilityTeamFilter"	"TEAM_ENEMY"
+	"AbilityCastRange"	"1"
+	"AbilityCooldown"	"1"
+	"AbilityAPCost"	"1"
+	"AnimationID"	"Attack"
+	"Icon"	"BasicSword"
+	"CastFXId"	"CommonSlashSoundFXMega"
+
+	"OnAbilityAction"
+	{
+		"Hit"
+		{
+			"Target"	"%TARGET"
+			"EffectName"	"GenericHitFXMega"
+			"Tags"	"stringList(#MELEE, #TARGETED)"
+			"InitActions"
+			{
+				"AddDamage"
+				{
+					"Type"	"DAMAGE_PHYSICAL"
+					"Damage"	"stat(%CASTER, #baseDamage)"
+				}
+			}
+		}
+	}
+}

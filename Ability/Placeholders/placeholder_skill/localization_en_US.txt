@@ -1,0 +1,2 @@
+"SKILL_placeholder_skill_NAME" = "Placeholder Skill"
+"SKILL_placeholder_skill_DESCRIPTION" = "A placeholder skill unlock."
