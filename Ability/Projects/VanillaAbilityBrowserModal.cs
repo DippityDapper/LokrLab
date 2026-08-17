@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Text;
 using LokrAbilityLab;
 using LokrAbilityLab.Editor;
 using LokrLab.Shell;
@@ -8,12 +10,14 @@ using UnityEngine;
 
 namespace LokrAbilityLab.Projects
 {
-	/// <summary>File → Browse Vanilla Abilities... reference view over the shipped ability catalog, with Copy into Library (Phase 2).</summary>
+	/// <summary>File → Browse Vanilla Abilities... reference view over the shipped ability catalog, with Copy into Library (Phases 2 and 4).</summary>
 	/// <remarks>
-	/// Phases 1-2 of the Vanilla Ability Edit track (docs/roadmaps/started/vanilla-ability-edit.md).
+	/// Phases 1-4 of the Vanilla Ability Edit track (docs/roadmaps/started/vanilla-ability-edit.md).
 	/// The detail view is read-only research (envelope fields, event list, which action types are
-	/// opaque to the current card editor, icon/FX names); Copy into Library
-	/// (VanillaAbilityImporter) actually writes a folder, in Override or Fork mode.
+	/// opaque to the current card editor, icon/FX names); Copy into Library (VanillaAbilityImporter)
+	/// actually writes a folder, in Override or Fork mode, behind a confirm step showing the "Used
+	/// by" blast radius (AbilityUsage.BlastRadius) and any global modifier id collisions
+	/// (VanillaAbilityImporter.FindModifierCollisions) -- Phase 4.
 	///
 	/// Registered with isVisible: IsLibraryOpen (AbilityLibraryProjectType.cs), not always-visible
 	/// like File -> Edit Vanilla Hero... -- changed 2026-08-17. Copy into Library always needs an
@@ -35,6 +39,12 @@ namespace LokrAbilityLab.Projects
 		private static UiStack detailBody;
 		private static UiLabel copyStatusLabel;
 		private static AbilityFileModel detailModel;
+
+		private static UiModal confirmModal;
+		private static UiLabel confirmMessageLabel;
+		private static string pendingCopyAbilityId;
+		private static string pendingCopyLibrary;
+		private static VanillaAbilityImportMode pendingCopyMode;
 
 		/// <summary>Shows the searchable list of shipped abilities.</summary>
 		internal static void Show()
@@ -84,7 +94,7 @@ namespace LokrAbilityLab.Projects
 			UiStack root = UiStack.Vertical(parent, theme, spacing: 8f, padding: 0f);
 
 			UiLabel explainer = UiLabel.Create(root.ContentTransform,
-				"Read-only reference. Override would replace the shipped ability everywhere; Fork would mint a new id for Lab characters only. Neither is wired up yet.",
+				"Pick an ability to see its structure and, if you want, copy it into a library as an Override (replaces the shipped ability everywhere) or a Fork (new id, vanilla untouched).",
 				theme, 12, TextAnchor.UpperLeft);
 			root.Add(explainer.FixedHeight(40f));
 			LabHoverInfo.Bind(explainer.GameObject, "ability.vanilla.OverrideVsFork");
@@ -207,7 +217,96 @@ namespace LokrAbilityLab.Projects
 				return;
 			}
 
-			if (!VanillaAbilityImporter.TryImport(detailModel.Id, library, mode, out string newFolder, out string error))
+			PromptCopyConfirm(detailModel, library, mode);
+		}
+
+		/// <summary>Phase 4: shows the "Used by" blast radius and any global modifier id collisions before committing the copy.</summary>
+		private static void PromptCopyConfirm(AbilityFileModel model, string library, VanillaAbilityImportMode mode)
+		{
+			if (!EnsureConfirmModal())
+			{
+				return;
+			}
+
+			pendingCopyAbilityId = model.Id;
+			pendingCopyLibrary = library;
+			pendingCopyMode = mode;
+
+			AbilityUsage.BlastRadiusResult blast = AbilityUsage.BlastRadius(model.Id);
+			List<(string ModifierId, string OwnerAbilityId)> collisions = VanillaAbilityImporter.FindModifierCollisions(model);
+
+			StringBuilder message = new StringBuilder();
+			message.Append(mode == VanillaAbilityImportMode.Override
+				? "Override replaces '" + model.Id + "' everywhere it's used, globally.\n\n"
+				: "Fork mints a new id -- vanilla itself is untouched.\n\n");
+
+			message.Append(blast.UnitIds.Count == 0
+				? "No currently known units reference this ability.\n"
+				: "Used by " + blast.UnitIds.Count + ": " + string.Join(", ", blast.UnitIds.ToArray()) + "\n");
+
+			if (blast.UsedInTutorialContent)
+			{
+				message.Append("At least one user is tutorial content -- this may affect the tutorial.\n");
+			}
+
+			if (collisions.Count > 0)
+			{
+				string ids = string.Join(", ", collisions.ConvertAll(c => c.ModifierId).ToArray());
+				message.Append(mode == VanillaAbilityImportMode.Override
+					? "\nModifier id(s) already exist globally (expected for Override, will be replaced): " + ids
+					: "\nWarning: Fork does not rename modifier ids. These already exist globally and this copy will replace them everywhere too, not just for this fork: " + ids);
+			}
+
+			confirmMessageLabel.SetText(message.ToString());
+			confirmModal.Show();
+		}
+
+		private static bool EnsureConfirmModal()
+		{
+			if (confirmModal != null && confirmModal.GameObject != null)
+			{
+				return true;
+			}
+
+			Transform canvas = LokrLab.Lab.Canvas;
+			if (canvas == null)
+			{
+				return false;
+			}
+
+			UiTheme theme = UiTheme.Default;
+			confirmModal = UiModal.Create(canvas, theme, "Confirm Copy", 560f, 280f);
+			UiStack content = UiStack.Vertical(confirmModal.ContentParent, theme, spacing: 8f, padding: 12f);
+			confirmModal.Add(content);
+			confirmMessageLabel = UiLabel.Create(content.ContentTransform, string.Empty, theme, 12, TextAnchor.UpperLeft);
+			content.Add(confirmMessageLabel.Grow());
+			UiStack buttons = UiStack.Horizontal(content.ContentTransform, theme, spacing: 8f, padding: 0f);
+			content.Add(buttons.FixedHeight(36f));
+			buttons.Add(UiButton.Create(buttons.ContentTransform, "Copy", OnCopyConfirmed, theme, primary: true).Grow());
+			buttons.Add(UiButton.Create(buttons.ContentTransform, "Cancel", confirmModal.Hide, theme, primary: false).FixedWidth(120f));
+			LabHoverInfo.Bind(confirmModal.GameObject, "ability.vanilla.CopyConfirm");
+			return true;
+		}
+
+		private static void OnCopyConfirmed()
+		{
+			if (confirmModal != null)
+			{
+				confirmModal.Hide();
+			}
+
+			string abilityId = pendingCopyAbilityId;
+			string library = pendingCopyLibrary;
+			VanillaAbilityImportMode mode = pendingCopyMode;
+			pendingCopyAbilityId = null;
+			pendingCopyLibrary = null;
+
+			if (string.IsNullOrEmpty(abilityId) || string.IsNullOrEmpty(library))
+			{
+				return;
+			}
+
+			if (!VanillaAbilityImporter.TryImport(abilityId, library, mode, out string newFolder, out string error))
 			{
 				copyStatusLabel.SetText(error ?? "Copy failed.");
 				return;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using Ironhide.Legends.Model.Game.Units.Abilities;
 using Ironhide.Localization;
 using LokrCharacterLoader;
 using LokrLab;
@@ -184,6 +185,41 @@ namespace LokrAbilityLab.Editor
 			}
 
 			File.WriteAllText(Path.Combine(destFolder, "localization_en_US.txt"), body.ToString());
+		}
+
+		/// <summary>Modifier id, and its current owning ability id if known, for every modifier this ability's body defines or references that already exists in the engine's global ability_modifiers table.</summary>
+		/// <remarks>
+		/// Phase 4's "warn on global modifier id collisions" (docs/roadmaps/started/vanilla-ability-edit.md)
+		/// -- ability_modifiers is a flat Dictionary&lt;string, Modifier&gt; on AbilitiesDefinitions,
+		/// engine-wide, not scoped per ability. For Override this collision is expected and intended
+		/// (last-wins is the point). For Fork it's a sharper warning: this importer never rekeys
+		/// modifier ids (see CollectModifierStems), so a Fork copy that keeps a vanilla modifier id
+		/// still globally replaces that same ability_modifiers entry at load
+		/// (AbilitiesDefinitionsPatches.ExecuteLoad) -- any other vanilla ability that ApplyModifiers
+		/// that id gets the fork's edited version too, even though the fork's own top-level id is new
+		/// and "vanilla is untouched" for everything else.
+		/// </remarks>
+		internal static List<(string ModifierId, string OwnerAbilityId)> FindModifierCollisions(AbilityFileModel model)
+		{
+			List<(string, string)> collisions = new List<(string, string)>();
+			Dictionary<string, Modifier> known = AbilitiesDefinitions.instance != null
+				? AbilitiesDefinitions.instance.ability_modifiers
+				: null;
+			if (known == null)
+			{
+				return collisions;
+			}
+
+			foreach (string stem in CollectModifierStems(model))
+			{
+				if (known.TryGetValue(stem, out Modifier modifier))
+				{
+					string owner = modifier != null && modifier.Ability != null ? modifier.Ability.abilityId : null;
+					collisions.Add((stem, owner));
+				}
+			}
+
+			return collisions;
 		}
 
 		/// <summary>Every modifier id this ability's body defines or references (ApplyModifier/RemoveModifier's ModifierName field), for pulling COMBAT_MODIFIER_&lt;id&gt;_* loc. Modifier ids are never rekeyed by this importer (only the ability's own top-level identity changes for Fork), so this is the same for Override and Fork.</summary>

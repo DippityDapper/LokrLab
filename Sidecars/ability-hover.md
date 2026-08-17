@@ -1123,7 +1123,11 @@ Read-only reference over every shipped ability, parsed live from the game's own 
 
 ## ability.vanilla.OverrideVsFork
 Override vs Fork
-Override would replace a shipped ability's id everywhere it's used (vanilla units, campaign, Lab characters) -- one ability, global. Fork mints a new id so only Lab characters you wire it to are affected; vanilla is untouched. Neither is available yet -- this browser is Phase 1, research only.
+Override would replace a shipped ability's id everywhere it's used (vanilla units, campaign, Lab characters) -- one ability, global. Fork mints a new id so only Lab characters you wire it to are affected; vanilla is untouched.
+
+## ability.vanilla.CopyConfirm
+Confirm Copy
+Shows which units currently reference this ability (the blast radius) and any global modifier id it already shares with another ability, before committing the copy.
 
 ## ability.vanilla.CopyOverride
 Copy into Library (Override)

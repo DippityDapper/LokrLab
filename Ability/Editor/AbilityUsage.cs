@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Ironhide.Legends.Model.Game.Units;
 using LokrCharacterLoader;
 using LokrLab;
+using LokrLab.Editor.General;
 using LokrModAPI;
 
 namespace LokrAbilityLab.Editor
@@ -11,6 +12,116 @@ namespace LokrAbilityLab.Editor
 	/// <summary>Who references an ability id, plus cheap walks of the body tree.</summary>
 	internal static class AbilityUsage
 	{
+		/// <summary>Every unit/character id that references an ability, plus whether any of them is tutorial-only content. Phase 4's "Used by" blast radius (docs/roadmaps/started/vanilla-ability-edit.md).</summary>
+		internal sealed class BlastRadiusResult
+		{
+			internal readonly List<string> UnitIds = new List<string>();
+			internal bool UsedInTutorialContent;
+		}
+
+		/// <summary>Every unit/character id that references an ability, for the copy-confirm warning before an Override/Fork commit.</summary>
+		/// <remarks>
+		/// Unlike CharactersUsing (which AbilitySandboxViewport relies on to pick used[0] as the
+		/// sandbox caster -- deliberately left alone so that selection doesn't change), this always
+		/// unions every source instead of stopping once one source finds a hit: live
+		/// CharacterAPI.KnownUnitDefinitions (currently-loaded content, including mods), the full
+		/// live vanilla catalog (VanillaUnitCatalog -- so a not-yet-loaded vanilla hero/enemy still
+		/// shows up), and Lab character.json folders (parsed structurally via
+		/// CharacterProfileSidecar, not ScanDiskCharacters' raw substring match, which false-positives
+		/// on any string field that happens to equal the ability id).
+		/// </remarks>
+		internal static BlastRadiusResult BlastRadius(string abilityId)
+		{
+			BlastRadiusResult result = new BlastRadiusResult();
+			if (string.IsNullOrEmpty(abilityId))
+			{
+				return result;
+			}
+
+			EnsureDefinitionsLoaded();
+			HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+			foreach (KeyValuePair<string, UnitDefinition> entry in CharacterAPI.KnownUnitDefinitions)
+			{
+				if (entry.Value != null && References(entry.Value, abilityId) && seen.Add(entry.Key))
+				{
+					result.UnitIds.Add(entry.Key);
+				}
+			}
+
+			foreach (KeyValuePair<string, UnitDefinition> entry in VanillaUnitCatalog.All())
+			{
+				if (entry.Value == null || !References(entry.Value, abilityId) || !seen.Add(entry.Key))
+				{
+					continue;
+				}
+
+				result.UnitIds.Add(entry.Key);
+				if (VanillaUnitCatalog.IsFromTutorialAsset(entry.Key))
+				{
+					result.UsedInTutorialContent = true;
+				}
+			}
+
+			ScanLabCharactersStructured(abilityId, result.UnitIds, seen);
+
+			result.UnitIds.Sort(StringComparer.OrdinalIgnoreCase);
+			return result;
+		}
+
+		/// <summary>Structured Lab character.json scan (CharacterProfileSidecar), for BlastRadius -- unlike ScanDiskCharacters, does not false-positive on a name/description string that happens to equal the ability id.</summary>
+		private static void ScanLabCharactersStructured(string abilityId, List<string> names, HashSet<string> seen)
+		{
+			if (ModAPI.Files == null)
+			{
+				return;
+			}
+
+			foreach (string category in new[] { "LokrCharacterLab", "Characters" })
+			{
+				foreach ((string _, string itemFolder) in ModAPI.Files.EnumerateCategorySubfolders(category))
+				{
+					CharacterProfile profile = CharacterProfileSidecar.Load(itemFolder);
+					if (profile == null || !ReferencesProfile(profile, abilityId))
+					{
+						continue;
+					}
+
+					string id = !string.IsNullOrEmpty(profile.Id) ? profile.Id : System.IO.Path.GetFileName(itemFolder);
+					if (seen.Add(id))
+					{
+						names.Add(id);
+					}
+				}
+			}
+		}
+
+		private static bool ReferencesProfile(CharacterProfile profile, string abilityId)
+		{
+			if (string.Equals(profile.DefaultSkill, abilityId, StringComparison.OrdinalIgnoreCase))
+			{
+				return true;
+			}
+
+			if (Contains(profile.Skills, abilityId))
+			{
+				return true;
+			}
+
+			if (profile.SkillProgression != null)
+			{
+				foreach (LevelSkillEntry entry in profile.SkillProgression)
+				{
+					if (entry != null && Contains(entry.SkillIds, abilityId))
+					{
+						return true;
+					}
+				}
+			}
+
+			return false;
+		}
+
 		internal static string DisplayName(string unitId)
 		{
 			if (string.IsNullOrEmpty(unitId))
