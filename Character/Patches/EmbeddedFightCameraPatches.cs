@@ -140,10 +140,12 @@ namespace LokrCharacterLab.Patches
 		}
 	}
 
-	/// <summary>Skips vanilla camera follow when Stage or the hex view is already gone.</summary>
+	/// <summary>Skips vanilla camera follow when Stage is gone, or Encounter Sandbox autofocus is suppressed.</summary>
 	/// <remarks>
 	/// Stop nulls <see cref="Stage.instance"/> while <see cref="UnloadSceneAsync"/> is still
 	/// finishing. Vanilla LateUpdate then NREs on initiative / target hex.
+	/// Encounter Sandbox also skips LateUpdate so tick-info pans do not jump the hole
+	/// camera. See <see cref="EncounterCamera.SuppressFightAutofocus"/>.
 	/// </remarks>
 	[HarmonyPatch(typeof(GameplayCamera), nameof(GameplayCamera.LateUpdate))]
 	internal static class EmbeddedFightGameplayCameraPatch
@@ -162,6 +164,11 @@ namespace LokrCharacterLab.Patches
 				return false;
 			}
 
+			if (EncounterCamera.SuppressFightAutofocus)
+			{
+				return false;
+			}
+
 			return true;
 		}
 
@@ -173,6 +180,26 @@ namespace LokrCharacterLab.Patches
 			}
 
 			EncounterCamera.ClampPlayPosition(__instance.cameraBase, EncounterCamera.ResolveHoleCamera());
+		}
+	}
+
+	/// <summary>Skips CameraBase target-follow tweens while Encounter Sandbox autofocus is off.</summary>
+	[HarmonyPatch(typeof(CameraBase), nameof(CameraBase.KeepTargetsOnCamera))]
+	internal static class EmbeddedFightKeepTargetsOnCameraPatch
+	{
+		private static bool Prefix()
+		{
+			return !EncounterCamera.SuppressFightAutofocus;
+		}
+	}
+
+	/// <summary>Skips CameraBase zoom-on-action while Encounter Sandbox autofocus is off.</summary>
+	[HarmonyPatch(typeof(CameraBase), nameof(CameraBase.ZoomOnAction))]
+	internal static class EmbeddedFightZoomOnActionPatch
+	{
+		private static bool Prefix()
+		{
+			return !EncounterCamera.SuppressFightAutofocus;
 		}
 	}
 

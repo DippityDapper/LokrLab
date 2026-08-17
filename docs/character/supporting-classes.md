@@ -416,6 +416,12 @@ ephemeral quests, restores captured camera ortho / bounds, hides debug UI, reset
 `SandboxFightControls.RecoverTurnChrome`, `EnsureFightHud`, and
 `EnsureFightInput` run on each `FightStartTurn` (cinematic HideHud,
 missed initiative portraits, walkable hex `Calculate`, and turn start).
+Authored combatant facing is applied once on `FightStartedEvent` (to
+undo StartFight LookAt), not on later `FightStartTurn` — that snap-back
+is [`sandbox-encounter-units-snap-to-authored-facing.md`](../../docs/issues/resolved/sandbox-encounter-units-snap-to-authored-facing.md).
+Encounter Sandbox skips vanilla fight-camera autofocus
+(`EncounterCamera.SuppressFightAutofocus`) until hole-space targeting
+is rewritten — [`sandbox-encounter-camera-autofocus-wrong.md`](../../docs/issues/unresolved/sandbox-encounter-camera-autofocus-wrong.md).
 `FightStartTurn` is raised at the end of the *current* unit's
 `StartUserInteraction`, so after an AI turn it does not run for the
 player. `EmbeddedFightStagePatch` postfixes `Stage.TurnStarted` and

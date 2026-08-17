@@ -661,7 +661,8 @@ namespace LokrLab
 				if (cameraBase.gameplayCamera != null)
 				{
 					cameraBase.gameplayCamera.TakenOver = false;
-					cameraBase.gameplayCamera.CameraAdjust = !EncounterEdit.IsArmed;
+					cameraBase.gameplayCamera.CameraAdjust = !EncounterEdit.IsArmed
+						&& !EncounterCamera.SuppressFightAutofocus;
 				}
 			}
 

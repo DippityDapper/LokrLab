@@ -22,6 +22,22 @@ namespace LokrLab.Encounter
 			}
 		}
 
+		/// <summary>True when Encounter Sandbox should skip vanilla fight-camera autofocus.</summary>
+		/// <remarks>
+		/// GameplayCamera LateUpdate, KeepTargetsOnCamera, and ZoomOnAction use a
+		/// fullscreen CameraWindow, so pans miss the hole. Temporary until
+		/// hole-space autofocus is rewritten. Drag and wheel zoom stay on
+		/// EmbeddedFightCameraPatches. See
+		/// docs/issues/unresolved/sandbox-encounter-camera-autofocus-wrong.md.
+		/// </remarks>
+		internal static bool SuppressFightAutofocus
+		{
+			get
+			{
+				return EncounterSandbox.IsArmed;
+			}
+		}
+
 		/// <summary>True when Encounter Play should ignore the mouse wheel.</summary>
 		internal static bool LockZoom
 		{
@@ -33,6 +49,10 @@ namespace LokrLab.Encounter
 		}
 
 		/// <summary>Writes <c>cameraLimits</c> and ortho min/max from the authored rect.</summary>
+		/// <remarks>
+		/// Leaves GameplayCamera.CameraAdjust off. Encounter Sandbox autofocus is
+		/// suppressed until hole-space targeting is rewritten.
+		/// </remarks>
 		/// <param name="frame">When true, centers the camera and applies Play ortho once. Later limit rewrites must not snap pan.</param>
 		internal static void ApplyPlay(CameraBase cameraBase, bool frame = false)
 		{
@@ -91,7 +111,7 @@ namespace LokrLab.Encounter
 			if (cameraBase.gameplayCamera != null)
 			{
 				cameraBase.gameplayCamera.TakenOver = false;
-				cameraBase.gameplayCamera.CameraAdjust = !camera.LockZoom;
+				cameraBase.gameplayCamera.CameraAdjust = false;
 			}
 
 			if (cameraBase.cinematicCamera != null)

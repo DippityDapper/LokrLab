@@ -298,6 +298,11 @@ namespace LokrCharacterLab
 			{
 				TrySpawnRosterBeforeFight(theEvent.stage);
 				FinishFightControls(theEvent.stage);
+				if (EncounterSandbox.IsArmed)
+				{
+					EncounterRoster.ApplyAuthoredFacing(EncounterSandbox.File);
+				}
+
 				Camera gameplay = ResolveGameplayCamera();
 				if (gameplay != null)
 				{
@@ -322,7 +327,12 @@ namespace LokrCharacterLab
 			FinishFightControls(theEvent.stage);
 		}
 
-		/// <summary>Restores HUD after spawn. A live Encounter fight keeps enemy AI; Sandbox Load Encounter may still show the debug panel.</summary>
+		/// <summary>Restores HUD after spawn and each FightStartTurn. A live Encounter fight keeps enemy AI; Sandbox Load Encounter may still show the debug panel.</summary>
+		/// <remarks>
+		/// Authored facing is applied from OnFightStarted only. This also runs on
+		/// FightStartTurn for HUD / take-over-AI; re-applying Flipped here snaps
+		/// units back after every action.
+		/// </remarks>
 		private static void FinishFightControls(Stage stage)
 		{
 			EncounterForeground.Hide();
@@ -336,7 +346,6 @@ namespace LokrCharacterLab
 			{
 				SandboxFightControls.Finish(
 					stage, takeOverAll: false, showDebugPanel: EncounterSandbox.ShowDebugPanel);
-				EncounterRoster.ApplyAuthoredFacing(EncounterSandbox.File);
 				return;
 			}
 

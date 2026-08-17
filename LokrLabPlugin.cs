@@ -35,7 +35,7 @@ namespace LokrLab
 		/// <summary>This plugin's display name, shown in BepInEx logs/UI.</summary>
 		public const string Name = "LoKR Lab";
 		/// <summary>This plugin's version, reported to BepInEx.</summary>
-		public const string Version = "0.12.114";
+		public const string Version = "0.12.116";
 
 		/// <summary>This plugin's shared logger.</summary>
 		internal static ManualLogSource Log;

@@ -367,6 +367,10 @@ namespace LokrLab.Encounter
 		}
 
 		/// <summary>Writes authored facing onto spawned units after StartFight may LookAt them.</summary>
+		/// <remarks>
+		/// Call once after FightStartedEvent. FightStartTurn also restores HUD;
+		/// re-applying here would snap live facing back to authored Flipped.
+		/// </remarks>
 		internal static void ApplyAuthoredFacing(EncounterFileModel file)
 		{
 			if (file == null || file.Combatants == null || lastSpawned == null)
