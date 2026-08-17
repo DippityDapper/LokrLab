@@ -9,6 +9,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using LokrCharacterLab;
 using LokrLab;
+using LokrLab.Shell;
 
 namespace LokrLab.Editor
 {
@@ -360,8 +361,34 @@ namespace LokrLab.Editor
 				result.ElapsedMs));
 		}
 
-		/// <summary>Called by Lab.SwitchToHome. The Animator may well have just Saved, so the checklist needs to reflect that; harmless as a no-op re-read on every other entry to Home too.</summary>
+		/// <summary>Called by Lab.SwitchToHome. The Animator may well have just Saved its rig, so the checklist needs to reflect that.</summary>
+		/// <remarks>
+		/// Skips the disk re-read while Properties has unsaved edits (LabSaveUx.IsDirty) -- Properties
+		/// fields no longer write through to character.json on every change (see
+		/// CharacterProfileService.MarkDirtyAndRefresh), so re-reading here unconditionally would
+		/// silently revert those in-memory edits to whatever's still on disk every time the player
+		/// visits the Animator and comes back. Safe to skip: nothing the Animator itself saves lives
+		/// in character.json, so the in-memory CurrentProfile is never stale relative to what the
+		/// Animator just wrote.
+		/// </remarks>
 		internal static void RefreshForReturnFromAnimator()
+		{
+			if (CurrentCharacterFolder != null && !LabSaveUx.IsDirty)
+			{
+				CurrentProfile = CharacterProfileSidecar.Load(CurrentCharacterFolder);
+			}
+			RefreshCurrentCharacterPanels();
+		}
+
+		/// <summary>Reloads the active character's profile from disk, discarding any unsaved Properties edits.</summary>
+		/// <remarks>
+		/// Called by LabSaveUx.OnPromptDiscard before proceeding to leave. Without this, the
+		/// in-memory CurrentProfile would still hold the discarded edits, and
+		/// LabContentReloader.TryAutoReloadOnLabClose's own unconditional
+		/// CharacterProfileService.PersistToDisk (run on Close Lab / Close Project) would write
+		/// those "discarded" edits to disk anyway.
+		/// </remarks>
+		internal static void DiscardUnsavedProfileEdits()
 		{
 			if (CurrentCharacterFolder != null)
 			{

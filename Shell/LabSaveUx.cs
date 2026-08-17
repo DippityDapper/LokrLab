@@ -1,6 +1,7 @@
 using System;
 using LokrAbilityLab.Editor;
 using LokrLab.Editor;
+using LokrLab.Editor.General;
 using LokrLab.Encounter;
 using LokrLab.Projects;
 using LokrLabApi;
@@ -13,9 +14,11 @@ namespace LokrLab.Shell
 {
 	/// <summary>Manual save chrome: dirty flag, Ctrl+S, title <c>*</c>, and save/discard/cancel on leave.</summary>
 	/// <remarks>
-	/// Animator pose/clip/rig edits, Ability form edits, and Encounter payload edits set
-	/// <see cref="ProjectSession.IsDirty"/>. Properties and aliases write through immediately and
-	/// do not use this flag.
+	/// Animator pose/clip/rig edits, Ability form edits, Encounter payload edits, and (since
+	/// 2026-08-17) Character Properties field edits all set <see cref="ProjectSession.IsDirty"/>
+	/// instead of writing to disk immediately -- see
+	/// <c>CharacterProfileService.MarkDirtyAndRefresh</c>. <c>LabAliasesInspector</c> still writes
+	/// aliases.json through immediately and does not use this flag.
 	/// </remarks>
 	internal static class LabSaveUx
 	{
@@ -93,13 +96,19 @@ namespace LokrLab.Shell
 
 			if (session.ProjectTypeId == CharacterProjectType.Id)
 			{
+				CharacterProfileService.PersistAndSync();
 				if (!RigEditorScene.IsRuntimeLive || string.IsNullOrEmpty(RigEditorScene.CurrentFolder))
 				{
-					ClearDirty();
 					return true;
 				}
 
-				return RigEditorScene.TrySaveRig(RigEditorScene.CurrentFolder);
+				bool rigSaved = RigEditorScene.TrySaveRig(RigEditorScene.CurrentFolder);
+				if (!rigSaved)
+				{
+					MarkDirty();
+				}
+
+				return rigSaved;
 			}
 
 			if (session.ProjectTypeId == LokrLabApi.LokrLabApi.AbilityLibraryTypeId)
@@ -232,6 +241,12 @@ namespace LokrLab.Shell
 
 		private static void OnPromptDiscard()
 		{
+			ProjectSession session = LokrLabApi.LokrLabApi.CurrentSession;
+			if (session != null && session.ProjectTypeId == CharacterProjectType.Id)
+			{
+				HomeWorkstationScene.DiscardUnsavedProfileEdits();
+			}
+
 			ClearDirty();
 			LeaveAfterPrompt();
 		}

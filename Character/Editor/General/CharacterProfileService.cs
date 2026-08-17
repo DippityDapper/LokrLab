@@ -2,10 +2,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using LokrLab;
+using LokrLab.Shell;
 
 namespace LokrLab.Editor.General
 {
-	/// <summary>Owns every field-level mutation of the active character's CharacterProfile, and the PersistAndSync write-through every mutation goes through.</summary>
+	/// <summary>Owns every field-level mutation of the active character's CharacterProfile. Mutations mark the session dirty and refresh Properties UI in place; LabSaveUx (Ctrl+S / File → Save / the close-prompt) owns actually writing character.json.</summary>
 	/// <remarks>
 	/// Extracted from HomeWorkstationScene (pre-redesign audit P2 "SRP / god classes" target
 	/// split, item 2 of 4 -- "CharacterProfileService: persistence + sync, replaces PersistAndSync
@@ -16,6 +17,13 @@ namespace LokrLab.Editor.General
 	/// directly rather than through HomeWorkstationScene's own CurrentProfile property, since that
 	/// property's setter is private to HomeWorkstationScene -- going straight to CharacterSession
 	/// avoids needing a second, wider access path opened up just for this move.
+	///
+	/// Originally every mutator wrote character.json to disk immediately (a write-through, from
+	/// before the manual save system in docs/roadmaps/completed/lab-save-ux.md existed). Changed
+	/// 2026-08-17 so mutators call MarkDirtyAndRefresh instead of PersistAndSync -- see that
+	/// method's own remarks. PersistAndSync itself is now the actual save path, called from
+	/// LabSaveUx.TrySaveCurrent and from PersistCurrentCharacter's own immediate-persist callers
+	/// (Sandbox Start, Reload in game), not from field mutators.
 	///
 	/// HomeWorkstationScene's own SetX/AddX/RemoveX method names all still exist, now as thin
 	/// forwards onto this class -- every Properties panel (CharacterGeneralPanel,
@@ -34,7 +42,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.Name = name ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets the current character's description and persists the change.</summary>
@@ -45,7 +53,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.Description = description ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets whether this character is a playable Hero or a non-playable Enemy/Summon unit, and persists the change. Switching to EnemySummon deletes any existing roster.json via RLHeroesGenerator.Sync's own EntityType branch, so no stale roster entry lingers.</summary>
@@ -56,7 +64,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.EntityType = entityType;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets which HeroRosterManager list this character belongs in and persists the change.</summary>
@@ -67,7 +75,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.Tier = tier;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets the current character's locked state and persists the change.</summary>
@@ -78,7 +86,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.Locked = locked;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets the current character's unlock-achievement id and persists the change.</summary>
@@ -89,7 +97,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.UnlockAchievement = unlockAchievement ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets the current character's "Model" KV field.</summary>
@@ -100,7 +108,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.Model = model ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets the current character's "AttackType" KV field.</summary>
@@ -111,7 +119,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.AttackType = attackType ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets the current character's "Icon" KV field.</summary>
@@ -122,7 +130,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.Icon = icon ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets the current character's "Background" KV field.</summary>
@@ -133,7 +141,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.Background = background ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets the current character's "UnitOnMap" KV field.</summary>
@@ -144,7 +152,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.UnitOnMap = unitOnMap ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets the current character's "PortraitBackgroundColor" KV field.</summary>
@@ -155,7 +163,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.PortraitBackgroundColor = hexColor ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Adds a cinematic tag unless the name is blank or already in the list.</summary>
@@ -171,7 +179,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.CinematicTags.Add(trimmed);
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Removes a cinematic tag from the list.</summary>
@@ -182,7 +190,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.CinematicTags.Remove(tag);
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Adds a skill id to the end of the current character's base-level "skills" block.</summary>
@@ -193,7 +201,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.Skills.Add(skillId.Trim());
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Removes one skill id from the base-level "skills" block by list index.</summary>
@@ -209,7 +217,7 @@ namespace LokrLab.Editor.General
 			{
 				SyncDefaultSkillWithProgression();
 			}
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Replaces one skill id in the base-level "skills" block by list index.</summary>
@@ -221,7 +229,7 @@ namespace LokrLab.Editor.General
 			}
 			string trimmed = skillId?.Trim() ?? string.Empty;
 			CharacterSession.Profile.Skills[index] = trimmed;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Skill ids valid for defaultSkill (basic attack). Excludes passive traits and skillProgression unlocks.</summary>
@@ -290,7 +298,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.DefaultSkill = trimmed;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		private static void SyncDefaultSkillWithProgression()
@@ -334,7 +342,7 @@ namespace LokrLab.Editor.General
 			}
 			CharacterSession.Profile.SkillProgression.Add(new LevelSkillEntry { Level = level, SkillIds = new List<string>() });
 			CharacterSession.Profile.SkillProgression.Sort((a, b) => a.Level.CompareTo(b.Level));
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Removes a skillProgression entry and all skill ids at that level.</summary>
@@ -350,7 +358,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.SkillProgression.Remove(entry);
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Changes the level key on one skillProgression entry.</summary>
@@ -371,7 +379,7 @@ namespace LokrLab.Editor.General
 			}
 			entry.Level = newLevel;
 			CharacterSession.Profile.SkillProgression.Sort((a, b) => a.Level.CompareTo(b.Level));
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Adds a skill id to one skillProgression level's grant list.</summary>
@@ -387,7 +395,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			entry.SkillIds.Add(skillId.Trim());
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Removes one skill id from a skillProgression level by list index.</summary>
@@ -403,7 +411,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			entry.SkillIds.RemoveAt(skillIndex);
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Replaces one skill id on a skillProgression level by list index.</summary>
@@ -419,7 +427,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			entry.SkillIds[skillIndex] = skillId?.Trim() ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Adds an empty locale entry, unless it's already tracked or not a recognized non-English locale.</summary>
@@ -430,7 +438,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.Localizations[locale] = new CharacterLocalizedText();
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Removes a locale entry, deleting its localization_&lt;locale&gt;.txt file so a stale translation doesn't linger on disk.</summary>
@@ -445,7 +453,7 @@ namespace LokrLab.Editor.General
 			{
 				File.Delete(path);
 			}
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets a locale entry's Name.</summary>
@@ -456,7 +464,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			entry.Name = name ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets a locale entry's Description.</summary>
@@ -467,7 +475,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			entry.Description = description ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets the current character's "soundConfig" block's "assetId" field.</summary>
@@ -478,7 +486,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.SoundAssetId = assetId ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Adds or updates one entry in the current character's <c>soundConfig.sounds</c> block.</summary>
@@ -490,7 +498,7 @@ namespace LokrLab.Editor.General
 			}
 			string key = eventName.Trim();
 			CharacterSession.Profile.SoundClips[key] = clipId?.Trim() ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Removes one entry from the current character's <c>soundConfig.sounds</c> block.</summary>
@@ -501,7 +509,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.SoundClips.Remove(eventName);
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Renames a sound event key while preserving its clip id.</summary>
@@ -519,7 +527,7 @@ namespace LokrLab.Editor.General
 			string clip = CharacterSession.Profile.SoundClips[oldEvent];
 			CharacterSession.Profile.SoundClips.Remove(oldEvent);
 			CharacterSession.Profile.SoundClips[trimmed] = clip;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets the clip id for an existing sound event key.</summary>
@@ -530,7 +538,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.SoundClips[eventName] = clipId ?? string.Empty;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Adds a new top rank to the archetype chain (one past the current highest), seeded with just a "level" stat, and selects it.</summary>
@@ -550,7 +558,7 @@ namespace LokrLab.Editor.General
 			}
 			CharacterSession.Profile.Levels.Add(new CharacterLevel { Level = nextLevel, Stats = new List<StatEntry> { new StatEntry { Name = "level", Value = nextLevel } } });
 			CharacterSession.SetEditingLevel(nextLevel);
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Removes a rank from the archetype chain (never the last remaining one), then renumbers the rest sequentially so the chain stays contiguous.</summary>
@@ -563,7 +571,7 @@ namespace LokrLab.Editor.General
 			CharacterSession.Profile.Levels.RemoveAll(existing => existing.Level == level);
 			RenumberLevels();
 			CharacterSession.SetEditingLevel(CharacterSession.Profile.Levels[0].Level);
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Renumbers Levels to 1..N in list order, keeping each entry's own "level" stat (if it has one) in sync.</summary>
@@ -591,7 +599,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			entry.Stats.Add(new StatEntry { Name = name, Value = 0f });
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Renames a stat on the given rank, unless the new name is blank, unchanged, or already used by another stat on that same rank.</summary>
@@ -604,7 +612,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			stat.Name = newName;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Sets a stat's value on the given rank.</summary>
@@ -617,7 +625,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			stat.Value = value;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Removes a stat entirely from the given rank.</summary>
@@ -629,7 +637,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			entry.Stats.RemoveAll(stat => stat.Name == name);
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Adds a new state flag, defaulted on, unless the name is blank or already tracked.</summary>
@@ -640,7 +648,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.States[name] = true;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Toggles a tracked state flag on/off.</summary>
@@ -651,7 +659,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.States[name] = on;
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Stops tracking a state flag entirely.</summary>
@@ -662,7 +670,7 @@ namespace LokrLab.Editor.General
 				return;
 			}
 			CharacterSession.Profile.States.Remove(name);
-			PersistAndSync();
+			MarkDirtyAndRefresh();
 		}
 
 		/// <summary>Copies sourcePath into this character's Portraits/&lt;id&gt;/&lt;id&gt;_&lt;slot&gt;.png slot, overwriting any existing file there. A no-op if sourcePath doesn't exist (e.g. the file browser was cancelled).</summary>
@@ -723,15 +731,38 @@ namespace LokrLab.Editor.General
 			RLHeroesGenerator.Sync(CharacterSession.Folder, CharacterSession.Profile);
 		}
 
-		/// <summary>Writes the current profile to character.json and regenerates rlheroes.txt/roster.json/localization, then refreshes every panel that shows profile data.</summary>
-		/// <remarks>internal (not private) so HomeWorkstationScene.PersistCurrentCharacter can call it directly for a persist-without-any-field-change request.</remarks>
+		/// <summary>Writes the current profile to character.json and regenerates rlheroes.txt/roster.json/localization, refreshes every panel that shows profile data, and clears the session's dirty flag.</summary>
+		/// <remarks>
+		/// The actual save path for a Character project: called from LabSaveUx.TrySaveCurrent (Ctrl+S,
+		/// File → Save, and Save from the unsaved-changes close prompt), and from
+		/// HomeWorkstationScene.PersistCurrentCharacter's own immediate-persist callers (Sandbox
+		/// Start, Reload in game) that need the profile actually on disk before a rescan. Field
+		/// mutators do not call this directly -- see MarkDirtyAndRefresh.
+		/// </remarks>
 		internal static void PersistAndSync()
 		{
-			EnsureDefaultSkillValid();
-			CharacterProfileSidecar.Save(CharacterSession.Folder, CharacterSession.Profile);
-			RLHeroesGenerator.Sync(CharacterSession.Folder, CharacterSession.Profile);
+			PersistToDisk();
 			PropertiesWorkstationScene.RefreshAll(CharacterSession.Profile);
 			HomeWorkstationScene.RefreshReadinessChecklist();
+			LabSaveUx.ClearDirty();
+		}
+
+		/// <summary>Refreshes Properties UI and the readiness checklist for an in-memory field edit, and marks the session dirty. Does not write to disk.</summary>
+		/// <remarks>
+		/// Every field mutator in this class calls this instead of PersistAndSync (changed
+		/// 2026-08-17). Before this, every keystroke/field change wrote character.json to disk
+		/// immediately -- a write-through that predates the manual save system
+		/// (docs/roadmaps/completed/lab-save-ux.md: IsDirty, Ctrl+S, title *, close prompt) and made
+		/// that system pointless for Properties. Now an edit only updates the in-memory profile and
+		/// the dirty flag; LabSaveUx.TrySaveCurrent -&gt; PersistAndSync is what actually writes to
+		/// disk, the same as Animator/Ability/Encounter edits already worked.
+		/// </remarks>
+		private static void MarkDirtyAndRefresh()
+		{
+			EnsureDefaultSkillValid();
+			PropertiesWorkstationScene.RefreshAll(CharacterSession.Profile);
+			HomeWorkstationScene.RefreshReadinessChecklist();
+			LabSaveUx.MarkDirty();
 		}
 	}
 }
