@@ -2509,7 +2509,18 @@ namespace LokrLab.Editor
 		}
 
 		/// <summary>Advances playback through the active frame's baked sub-frame sequence (PoseFrame.BakedFrames) using each sub-frame's own Duration, making eased transitions visible during Play. Rolls over into the next frame's baked group once the current one is exhausted.</summary>
-		/// <remarks>Applies each tick's pose via ApplyPoseFrameToParts (not ApplyContextPoseToParts), since a baked sub-frame should never be read back as if it were an edit; rebakes explicitly since this skips ApplyContextPoseToParts' own rebake step.</remarks>
+		/// <remarks>
+		/// Applies each tick's pose via ApplyPoseFrameToParts (not ApplyContextPoseToParts), since a
+		/// baked sub-frame should never be read back as if it were an edit. Deliberately does not
+		/// rebake or call the full RefreshTimeline() here: BakedFrames was already made fresh once
+		/// when Play started (TogglePlayback's own RefreshTimeline call), and nothing mutates
+		/// PoseFrame data during a pure playback tick -- an edit action pauses playback first (see
+		/// PausePlayback), so re-deriving BakedFrames or rebuilding every dependent panel on every
+		/// sub-frame rollover was pure waste that scaled with the rig's total frame count. See
+		/// docs/issues/unresolved/animator-playback-lag-scales-with-frame-count.md. Only the
+		/// timeline's active-chip highlight actually changes per tick, so that's the only panel
+		/// touched here (AnimationTimelinePanel.RefreshActiveHighlight recolors in place, no rebuild).
+		/// </remarks>
 		internal static void TickPlayback(float deltaTime)
 		{
 			if (!isPlaying || activeClip == null || activeClip.PoseFrames.Count == 0)
@@ -2534,14 +2545,13 @@ namespace LokrLab.Editor
 					activeFrameIndex = (activeFrameIndex + 1) % activeClip.PoseFrames.Count;
 					BumpPoseContext();
 				}
-				RebakeAllClips();
 				PoseFrame newFrame = activeClip.PoseFrames[activeFrameIndex];
 				PoseFrame newBaked = newFrame.BakedFrames.Count > 0
 					? newFrame.BakedFrames[Mathf.Clamp(activeBakedIndex, 0, newFrame.BakedFrames.Count - 1)]
 					: newFrame;
 				ApplyPoseFrameToParts(newBaked);
 				RefreshPreviewFrame();
-				RefreshTimeline();
+				AnimationTimelinePanel.RefreshActiveHighlight(activeFrameIndex, activeBakedIndex);
 			}
 		}
 

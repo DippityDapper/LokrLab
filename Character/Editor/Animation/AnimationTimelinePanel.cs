@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using SimpleUI;
 using UnityEngine;
 using LokrLab;
@@ -26,6 +27,13 @@ namespace LokrLab.Editor.Animation
 		private static readonly Color GhostInactiveColor = new Color(0.4f, 0.42f, 0.48f, 0.65f);
 
 		private static UiStack chipRow;
+
+		/// <summary>Frame chips built by the last <see cref="Refresh"/>, indexed by frame index, so <see cref="RefreshActiveHighlight"/> can recolor the active chip during playback without a full Clear()+rebuild.</summary>
+		private static readonly List<UiButton> frameChips = new List<UiButton>();
+
+		/// <summary>Baked sub-chips per frame built by the last <see cref="Refresh"/>, indexed the same way as <see cref="frameChips"/>.</summary>
+		private static readonly List<List<UiButton>> bakedSubChips = new List<List<UiButton>>();
+
 		private static UiButton playPauseButton;
 		private static UiButton copyFrameButton;
 		private static UiButton pasteFrameButton;
@@ -81,6 +89,8 @@ namespace LokrLab.Editor.Animation
 		internal static void Unbind()
 		{
 			chipRow = null;
+			frameChips.Clear();
+			bakedSubChips.Clear();
 			playPauseButton = null;
 			copyFrameButton = null;
 			pasteFrameButton = null;
@@ -99,6 +109,8 @@ namespace LokrLab.Editor.Animation
 			}
 
 			chipRow.Clear();
+			frameChips.Clear();
+			bakedSubChips.Clear();
 
 			if (activeClip != null)
 			{
@@ -136,11 +148,13 @@ namespace LokrLab.Editor.Animation
 			chip.SetColor(frameIndex == activeFrameIndex ? UiTheme.Default.AccentColor : UiTheme.Default.RowButtonColor);
 			group.Add(chip.FixedHeight(ChipSize));
 			LabHoverInfo.Bind(chip.GameObject, "animator.timeline.FrameChip");
+			frameChips.Add(chip);
 
 			int bakedCount = Mathf.Max(1, frame.BakedFrames.Count);
 			float subWidth = (ChipSize - (bakedCount - 1) * BakedSubGap) / bakedCount;
 			UiStack bakedRow = UiStack.Horizontal(group.ContentTransform, UiTheme.Default, spacing: BakedSubGap, padding: 0f);
 			group.Add(bakedRow.FixedHeight(BakedChipHeight));
+			List<UiButton> subChips = new List<UiButton>(bakedCount);
 			for (int j = 0; j < bakedCount; j++)
 			{
 				int capturedFrame = frameIndex;
@@ -151,6 +165,34 @@ namespace LokrLab.Editor.Animation
 				subChip.SetColor(isActive ? UiTheme.Default.AccentColor : GhostInactiveColor);
 				bakedRow.Add(subChip);
 				LabHoverInfo.Bind(subChip.GameObject, "animator.timeline.BakedChip");
+				subChips.Add(subChip);
+			}
+			bakedSubChips.Add(subChips);
+		}
+
+		/// <summary>Recolors the active frame chip and active baked sub-chip in the existing strip without rebuilding it.</summary>
+		/// <remarks>
+		/// Playback advances which chip is "active" every tick, but never changes the chip strip's
+		/// structure (frame count, baked-sub-chip count per frame) mid-play -- editing is what
+		/// changes structure, and editing pauses playback first (see PausePlayback). Calling the
+		/// full Clear()+rebuild <see cref="Refresh"/> on every tick was real GameObject
+		/// Instantiate/Destroy/layout work scaling with frame count, several times a second, which
+		/// is the dominant cost behind
+		/// docs/issues/unresolved/animator-playback-lag-scales-with-frame-count.md. This only
+		/// touches already-built buttons' colors. No-ops if the strip hasn't been built (or was
+		/// rebuilt with a different frame count than the tracking lists expect) yet.
+		/// </remarks>
+		internal static void RefreshActiveHighlight(int activeFrameIndex, int activeBakedIndex)
+		{
+			for (int i = 0; i < frameChips.Count; i++)
+			{
+				frameChips[i].SetColor(i == activeFrameIndex ? UiTheme.Default.AccentColor : UiTheme.Default.RowButtonColor);
+				List<UiButton> subChips = bakedSubChips[i];
+				for (int j = 0; j < subChips.Count; j++)
+				{
+					bool isActive = i == activeFrameIndex && j == activeBakedIndex;
+					subChips[j].SetColor(isActive ? UiTheme.Default.AccentColor : GhostInactiveColor);
+				}
 			}
 		}
 	}
