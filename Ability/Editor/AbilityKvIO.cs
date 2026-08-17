@@ -52,11 +52,19 @@ namespace LokrAbilityLab.Editor
 				return false;
 			}
 
-			KeyValue root = roots[0];
-			model = new AbilityFileModel
+			model = LoadFromKeyValue(roots[0], filePath);
+			error = null;
+			return true;
+		}
+
+		/// <summary>Builds a file model from one already-parsed top-level ability block, without touching disk.</summary>
+		/// <remarks>Factored out of TryLoad so a source that isn't "exactly one block in one file" can still build the same model -- see LoadAllFromText, used by VanillaAbilityCatalog for vanilla bundle TextAssets, several of which hold more than one top-level block (e.g. _basicAbilities.txt).</remarks>
+		internal static AbilityFileModel LoadFromKeyValue(KeyValue root, string sourceLabel)
+		{
+			return new AbilityFileModel
 			{
 				Id = root.Key,
-				SourceFilePath = filePath,
+				SourceFilePath = sourceLabel,
 				BehaviorFlags = ParseFlags(GetString(root, "AbilityBehavior", string.Empty)),
 				LocalizationId = GetString(root, "LocalizationId", string.Empty),
 				TeamFilter = GetString(root, "AbilityTeamFilter", "TEAM_ENEMY"),
@@ -79,9 +87,37 @@ namespace LokrAbilityLab.Editor
 				CastFXId = GetString(root, "CastFXId", string.Empty),
 				Body = ParseBody(root),
 			};
+		}
 
-			error = null;
-			return true;
+		/// <summary>Parses every top-level ability block in raw KV text. Blocks that fail to parse are skipped and reported in errors rather than thrown, so one bad block doesn't drop the rest of a multi-block asset.</summary>
+		internal static List<AbilityFileModel> LoadAllFromText(string text, string sourceLabel, out List<string> errors)
+		{
+			errors = new List<string>();
+			List<AbilityFileModel> models = new List<AbilityFileModel>();
+			KeyValue[] roots;
+			try
+			{
+				roots = KVParser.KV1.ParseAll(text);
+			}
+			catch (Exception ex)
+			{
+				errors.Add(sourceLabel + ": could not parse KV text: " + ex.Message);
+				return models;
+			}
+
+			foreach (KeyValue root in roots)
+			{
+				try
+				{
+					models.Add(LoadFromKeyValue(root, sourceLabel));
+				}
+				catch (Exception ex)
+				{
+					errors.Add(sourceLabel + "/" + root.Key + ": " + ex.Message);
+				}
+			}
+
+			return models;
 		}
 
 		/// <summary>Writes envelope + serialized body. Rejects literal quotes in envelope fields.</summary>

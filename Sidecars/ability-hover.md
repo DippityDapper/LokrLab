@@ -1116,3 +1116,11 @@ Attach literal for ground FX (base socket).
 ## token.#CastPoint
 #CastPoint
 Attach literal for cast-origin sockets.
+
+## ability.vanilla.Browse
+Browse Vanilla Abilities
+Read-only reference over every shipped ability, parsed live from the game's own data. Does not open, copy, or edit anything. See docs/roadmaps/started/vanilla-ability-edit.md.
+
+## ability.vanilla.OverrideVsFork
+Override vs Fork
+Override would replace a shipped ability's id everywhere it's used (vanilla units, campaign, Lab characters) -- one ability, global. Fork mints a new id so only Lab characters you wire it to are affected; vanilla is untouched. Neither is available yet -- this browser is Phase 1, research only.

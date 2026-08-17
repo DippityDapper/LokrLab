@@ -54,6 +54,7 @@ namespace LokrAbilityLab.Projects
 			LokrLabApi.LokrLabApi.RegisterMenu("File", priority: 0);
 			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "New Ability", PromptNewAbility, priority: 5,
 				isVisible: IsLibraryOpen);
+			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Browse Vanilla Abilities...", VanillaAbilityBrowserModal.Show, priority: 8);
 		}
 
 		private static ProjectSession CreateNew()

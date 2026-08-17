@@ -353,6 +353,8 @@ namespace LokrAbilityLab.Editor
 			Add("encounter.terrain.Source", "Terrain source", "template is the host room. import is another stage. custom is a stub with no floor art yet.");
 			Add("encounter.terrain.Use", "Use for Paint", "Selects this terrain and switches Setup to Paint Terrain. Then left-drag on the board.");
 			Add("encounter.terrain.Remove", "Remove Terrain", "Drops an import or custom row. Host template rows come back on the next scan.");
+			Add("ability.vanilla.Browse", "Browse Vanilla Abilities", "Read-only reference over every shipped ability, parsed live from the game's own data. Does not open, copy, or edit anything.");
+			Add("ability.vanilla.OverrideVsFork", "Override vs Fork", "Override would replace a shipped ability's id everywhere it's used -- one ability, global. Fork mints a new id so only wired Lab characters are affected; vanilla is untouched. Neither is available yet -- this browser is research only.");
 			Add("sandbox.Level", "Sandbox Level", "Always Level 1, 2, or 3. Sets the hero rank for this Sandbox run.");
 			Add("sandbox.Start", "Start sandbox", "Plays the open encounter, or a 1v1 in Character / Ability. Same Sandbox hole everywhere.");
 			Add("encounter.combatant.Side", "Side", "GoodSide (player) or BadSide (AI). Sandbox refuses zero GoodSide. OwnSide is not v1.");
