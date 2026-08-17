@@ -8,15 +8,20 @@ using UnityEngine;
 
 namespace LokrAbilityLab.Projects
 {
-	/// <summary>File → Browse Vanilla Abilities... read-only reference view over the shipped ability catalog.</summary>
+	/// <summary>File → Browse Vanilla Abilities... reference view over the shipped ability catalog, with Copy into Library (Phase 2).</summary>
 	/// <remarks>
-	/// Phase 1 of the Vanilla Ability Edit track (docs/roadmaps/started/vanilla-ability-edit.md):
-	/// look at a shipped ability's structure -- envelope fields, event list, which action types are
-	/// opaque to the current card editor, icon/FX names -- before deciding whether a later "Edit
-	/// Vanilla Ability..." (Phase 2+) should override or fork it. Deliberately does not open, copy,
-	/// or edit anything; no load-path or override semantics are touched here. Registered with no
-	/// isVisible guard (matching File -> Edit Vanilla Hero...) so browsing works before any Ability
-	/// Library is open.
+	/// Phases 1-2 of the Vanilla Ability Edit track (docs/roadmaps/started/vanilla-ability-edit.md).
+	/// The detail view is read-only research (envelope fields, event list, which action types are
+	/// opaque to the current card editor, icon/FX names); Copy into Library
+	/// (VanillaAbilityImporter) actually writes a folder, in Override or Fork mode.
+	///
+	/// Registered with isVisible: IsLibraryOpen (AbilityLibraryProjectType.cs), not always-visible
+	/// like File -> Edit Vanilla Hero... -- changed 2026-08-17. Copy into Library always needs an
+	/// open library as its target (ResolveTargetLibrary requires one and no longer falls back to an
+	/// arbitrary "first" library or auto-creates one), so showing this entry before a library is
+	/// open led to a dead end: browse, then find every Copy button refuses to do anything. Gating
+	/// the whole entry on IsLibraryOpen (the same guard "New Ability" already uses) means it only
+	/// ever appears somewhere the copy can actually succeed.
 	/// </remarks>
 	internal static class VanillaAbilityBrowserModal
 	{
