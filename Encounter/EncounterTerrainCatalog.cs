@@ -343,8 +343,12 @@ namespace LokrLab.Encounter
 		/// <c>AssetBundleManager.LoadAssetBundle</c> always hits disk and stores the
 		/// result, even when Unity refuses a duplicate load. Reuse <c>GetBundle</c>
 		/// (and Unity's already-loaded list) so we never write null over the cache.
+		/// Internal (not private) so <c>EncounterPropCatalog</c> can fall back to this
+		/// bundle when a room's scenery prop isn't in the separate <c>scenario</c> bundle
+		/// catalog -- some vanilla combat-room dressing is embedded in <c>templates</c>
+		/// itself rather than the curated deco set.
 		/// </remarks>
-		private static AssetBundle EnsureTemplatesBundle()
+		internal static AssetBundle EnsureTemplatesBundle()
 		{
 			AssetBundle bundle = AssetBundleManager.GetBundle("templates");
 			if (bundle != null)

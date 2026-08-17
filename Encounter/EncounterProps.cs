@@ -171,7 +171,9 @@ namespace LokrLab.Encounter
 			GameObject prefab = EncounterPropCatalog.Load(prop.PrefabName);
 			if (prefab == null)
 			{
-				LokrLab.Lab.SetStatus("Could not load prop '" + prop.PrefabName + "'.");
+				string message = "Could not load prop '" + prop.PrefabName + "' (checked scenario and templates bundles).";
+				LokrLab.Lab.SetStatus(message);
+				LokrLabPlugin.Log.LogWarning(message);
 				return null;
 			}
 

@@ -56,16 +56,31 @@ namespace LokrLab.Encounter
 			return cachedNames;
 		}
 
-		/// <summary>Loads the scenario prefab, or null when the bundle or name is missing.</summary>
+		/// <summary>Loads the scenario prefab by name, falling back to the templates bundle. Null when neither has it.</summary>
+		/// <remarks>
+		/// Most Add Prop catalogue picks are curated <c>scenario</c> deco names (see the class
+		/// remarks). Props read off a vanilla room's own <c>encounterObjs</c> by
+		/// <c>VanillaEncounterImporter</c> are not guaranteed to be scenario-bundle deco --
+		/// some room-specific dressing is embedded directly in the <c>templates</c> bundle the
+		/// room prefab itself came from, so a scenario miss falls back there before giving up.
+		/// </remarks>
 		internal static GameObject Load(string prefabName)
 		{
-			AssetBundle bundle = EnsureScenarioBundle();
-			if (bundle == null || string.IsNullOrEmpty(prefabName))
+			if (string.IsNullOrEmpty(prefabName))
 			{
 				return null;
 			}
 
-			return bundle.LoadAsset<GameObject>(prefabName.ToLowerInvariant());
+			string name = prefabName.ToLowerInvariant();
+			AssetBundle scenario = EnsureScenarioBundle();
+			GameObject prefab = scenario != null ? scenario.LoadAsset<GameObject>(name) : null;
+			if (prefab != null)
+			{
+				return prefab;
+			}
+
+			AssetBundle templates = EncounterTerrainCatalog.EnsureTemplatesBundle();
+			return templates != null ? templates.LoadAsset<GameObject>(name) : null;
 		}
 
 		/// <summary>Short label for the Add Prop picker.</summary>

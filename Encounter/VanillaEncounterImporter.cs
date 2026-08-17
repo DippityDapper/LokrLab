@@ -68,6 +68,7 @@ namespace LokrLab.Encounter
 			internal int BkgDefinitionVariantCount;
 			internal int PropsImported;
 			internal int PropsWithChildrenFlattened;
+			internal int PropsUnresolved;
 			internal readonly List<string> Warnings = new List<string>();
 		}
 
@@ -279,6 +280,16 @@ namespace LokrLab.Encounter
 		}
 
 		/// <summary>Imports EncounterData.encounterObjs (scenery -- barrels, statues, etc; a separate list from the spawn lists) as free-placed, unsnapped props. xPos/yPos are raw local-position data on TemplateObjectData, in the same room-local frame data.spawnPos uses for combatants, so they carry over directly with no hex conversion and no pad adjustment (a continuous world position doesn't need the pad's cell-index shift the way a hex hex Col/Row does). Nested TemplateObjectDataChild entries (a prop's own attached sub-decorations) are not imported -- they're addressed only by a GameObject reference, not a bundle name string, so there is no prefab name to write into EncounterPropModel.PrefabName; entries with children are flagged in the result instead of silently dropping the child detail.</summary>
+		/// <remarks>
+		/// TemplateObjectData.prefabName is not read anywhere in vanilla's own runtime
+		/// (grepped -- only EncounterEntitiesGenerator.InstantiateObject uses
+		/// prefabReference to spawn) so it is likely an editor-only, possibly-blank
+		/// convenience field, not a reliable load key. prefabReference.name (the actual
+		/// Unity object the game itself instantiates) is preferred whenever the reference
+		/// resolved; the string field is only a fallback. Ensures the scenario bundle is
+		/// loaded first so a cross-bundle prefabReference has a chance to resolve rather
+		/// than reading null off a templates-only load.
+		/// </remarks>
 		private static void ImportProps(List<TemplateObjectData> objs, EncounterFileModel file, HashSet<string> usedIds, ImportResult result)
 		{
 			if (objs == null)
@@ -286,11 +297,14 @@ namespace LokrLab.Encounter
 				return;
 			}
 
+			EncounterPropCatalog.GetBundle();
+
 			foreach (TemplateObjectData data in objs)
 			{
-				string prefabName = (data.prefabName ?? string.Empty).Trim().ToLowerInvariant();
+				string prefabName = ResolvePropPrefabName(data);
 				if (string.IsNullOrEmpty(prefabName))
 				{
+					result.PropsUnresolved++;
 					continue;
 				}
 
@@ -320,6 +334,23 @@ namespace LokrLab.Encounter
 				result.Warnings.Add(result.PropsWithChildrenFlattened
 					+ " prop(s) have attached sub-decorations (TemplateObjectDataChild) that were not imported -- only the parent prop was.");
 			}
+
+			if (result.PropsUnresolved > 0)
+			{
+				result.Warnings.Add(result.PropsUnresolved
+					+ " prop(s) had neither a resolved prefabReference nor a prefabName and were skipped.");
+			}
+		}
+
+		/// <summary>The name the game itself would instantiate (prefabReference.name) when resolved, else the possibly-blank editor-only prefabName string.</summary>
+		private static string ResolvePropPrefabName(TemplateObjectData data)
+		{
+			if (data.prefabReference != null && !string.IsNullOrEmpty(data.prefabReference.name))
+			{
+				return data.prefabReference.name.Trim().ToLowerInvariant();
+			}
+
+			return (data.prefabName ?? string.Empty).Trim().ToLowerInvariant();
 		}
 
 		/// <summary>Sets file.Camera from the board prefab's authored art bounds, or a hex-extent estimate when no board art is found.</summary>
