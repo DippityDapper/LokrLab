@@ -56,6 +56,21 @@ namespace LokrAbilityLab.Projects
 				isVisible: IsLibraryOpen);
 			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Browse Vanilla Abilities...", VanillaAbilityBrowserModal.Show, priority: 8,
 				isVisible: IsLibraryOpen);
+			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Run Vanilla Ability Fidelity Audit", RunFidelityAudit, priority: 11);
+		}
+
+		/// <summary>Phase 3 of the Vanilla Ability Edit track: writes docs/roadmaps/started/vanilla-ability-edit.md's round-trip fidelity audit report. See AbilityRoundTripAudit's own remarks for why this runs on demand rather than as a unit test.</summary>
+		private static void RunFidelityAudit()
+		{
+			string path = AbilityRoundTripAudit.Run(out string summary);
+			if (path == null)
+			{
+				LokrAbilityLabPlugin.Log.LogWarning("Vanilla ability fidelity audit: " + summary);
+			}
+			else
+			{
+				LokrAbilityLabPlugin.Log.LogInfo("Vanilla ability fidelity audit: " + summary + " Report: " + path);
+			}
 		}
 
 		private static ProjectSession CreateNew()
