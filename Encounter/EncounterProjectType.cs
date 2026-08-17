@@ -80,6 +80,7 @@ namespace LokrLab.Encounter
 				isVisible: IsEncounterSession);
 			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Add Spawn Point", PromptAddSpawnPoint, priority: 9,
 				isVisible: IsEncounterSession);
+			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Import Vanilla Encounter...", VanillaEncounterImportModal.Show, priority: 10);
 			registration.RegisterWorkspace(new WorkspaceRegistration
 			{
 				Name = EncounterSetupViewport.WorkspaceName,

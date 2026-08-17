@@ -251,3 +251,7 @@ Plays this encounter in the hole (unsaved edits included). Needs a GoodSide comb
 ## sandbox.Stop
 Stop sandbox
 Unloads the fight hole. Leaving the workspace also stops.
+
+## encounter.vanilla.Import
+Import Vanilla Encounter
+Read-only import spike. Reconstructs a shipped combat room's combatants and impassable hexes into a brand-new Lab Encounter project -- vanilla is never touched. Lua, cinematics, and quest-gated variants are not imported; see the log for the full loss-list report.

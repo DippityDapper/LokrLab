@@ -325,7 +325,9 @@ namespace LokrLab.Encounter
 			return null;
 		}
 
-		private static GameObject LoadPrefab(string template)
+		/// <summary>Loads a templates-bundle prefab by name, read-only. Never instantiates it.</summary>
+		/// <remarks>Internal (not private) so VanillaEncounterImporter can reuse the same EnsureTemplatesBundle guard rather than loading the templates bundle a second, independent way -- see that guard's own remarks for why a naive second load is dangerous.</remarks>
+		internal static GameObject LoadPrefab(string template)
 		{
 			AssetBundle bundle = EnsureTemplatesBundle();
 			if (string.IsNullOrEmpty(template) || bundle == null)

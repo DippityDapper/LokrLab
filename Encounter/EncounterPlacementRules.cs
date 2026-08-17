@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace LokrLab.Encounter
@@ -23,9 +24,31 @@ namespace LokrLab.Encounter
 		/// <summary>Dominant authored skirmish height.</summary>
 		internal const int DefaultAuthoredHeight = 20;
 
-		/// <summary>Authored <c>hexWidth</c> / <c>hexHeight</c> for a known empty template, else the dominant 16×20.</summary>
+		private static readonly Dictionary<string, (int Width, int Height)> RegisteredSizes =
+			new Dictionary<string, (int, int)>(StringComparer.OrdinalIgnoreCase);
+
+		/// <summary>Records a template's real authored size, read off its actual boardMetadata (VanillaEncounterImporter) rather than guessed.</summary>
+		/// <remarks>The dominant-size fallback below is wrong for ~30% of shipped rooms (182/610 are 20×24, not 16×20) -- this lets an actual import correct AuthoredSize for that one template without needing every caller to change.</remarks>
+		internal static void RegisterAuthoredSize(string template, int width, int height)
+		{
+			if (string.IsNullOrEmpty(template) || width <= 0 || height <= 0)
+			{
+				return;
+			}
+
+			RegisteredSizes[template] = (width, height);
+		}
+
+		/// <summary>Authored <c>hexWidth</c> / <c>hexHeight</c> for a template with a registered real size, else a known empty template, else the dominant 16×20 guess.</summary>
 		internal static void AuthoredSize(string template, out int width, out int height)
 		{
+			if (!string.IsNullOrEmpty(template) && RegisteredSizes.TryGetValue(template, out (int Width, int Height) registered))
+			{
+				width = registered.Width;
+				height = registered.Height;
+				return;
+			}
+
 			if (string.Equals(template, "combat_wip", StringComparison.OrdinalIgnoreCase))
 			{
 				width = 16;

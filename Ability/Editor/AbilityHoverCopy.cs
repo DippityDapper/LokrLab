@@ -358,6 +358,7 @@ namespace LokrAbilityLab.Editor
 			Add("ability.vanilla.CopyOverride", "Copy into Library (Override)", "Copies this ability into a Lab library folder, keeping its vanilla KV block key so last-wins replaces it everywhere at load. Not yet openable from an Edit Vanilla Ability button -- open it from the library like any other ability.");
 			Add("ability.vanilla.CopyFork", "Copy into Library (Fork)", "Copies this ability into a Lab library folder under a newly minted id. Vanilla is untouched; only Lab characters you separately assign this new id to are affected.");
 			Add("ability.vanilla.CopyConfirm", "Confirm Copy", "Shows which units currently reference this ability (the blast radius) and any global modifier id it already shares with another ability, before committing the copy.");
+			Add("encounter.vanilla.Import", "Import Vanilla Encounter", "Read-only import spike. Reconstructs a shipped combat room's combatants and impassable hexes into a brand-new Lab Encounter project -- vanilla is never touched. Lua, cinematics, and quest-gated variants are not imported; see the log for the full loss-list report.");
 			Add("sandbox.Level", "Sandbox Level", "Always Level 1, 2, or 3. Sets the hero rank for this Sandbox run.");
 			Add("sandbox.Start", "Start sandbox", "Plays the open encounter, or a 1v1 in Character / Ability. Same Sandbox hole everywhere.");
 			Add("encounter.combatant.Side", "Side", "GoodSide (player) or BadSide (AI). Sandbox refuses zero GoodSide. OwnSide is not v1.");
