@@ -71,11 +71,12 @@ namespace LokrAbilityLab.Editor
 		};
 
 		/// <summary>Every legal modifier On* name from ModifierEvents.cs.</summary>
+		/// <remarks>OnSpawn was missing here (present in DefaultModifierEvents above) until 2026-08-17, so TryFindIllegalEvent rejected any save of the ~13 vanilla files whose modifiers use it -- found while scoping the Vanilla Ability Edit track's copy-into-library pipeline.</remarks>
 		internal static readonly string[] AllModifierEvents =
 		{
 			"OnAbilityStart", "OnAbilityAction", "OnAbilityEnd",
 			"OnAttackStart", "OnAttackAction", "OnAttackEnd",
-			"OnAdded", "OnRemoved", "OnAttacked", "OnDamaged", "OnUnitDamaged",
+			"OnAdded", "OnRemoved", "OnAttacked", "OnDamaged", "OnUnitDamaged", "OnSpawn",
 			"OnTurnStarted", "OnTurnFinished", "OnTurnStartedGlobal", "OnTurnFinishedGlobal",
 			"OnEndTurnSkillCheck", "OnPreAttack", "OnPostAttack", "OnAttack",
 			"OnUnitMoved", "OnUnitLeavingNode", "OnUnitEnteredNode",

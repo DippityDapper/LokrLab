@@ -1124,3 +1124,11 @@ Read-only reference over every shipped ability, parsed live from the game's own 
 ## ability.vanilla.OverrideVsFork
 Override vs Fork
 Override would replace a shipped ability's id everywhere it's used (vanilla units, campaign, Lab characters) -- one ability, global. Fork mints a new id so only Lab characters you wire it to are affected; vanilla is untouched. Neither is available yet -- this browser is Phase 1, research only.
+
+## ability.vanilla.CopyOverride
+Copy into Library (Override)
+Copies this ability into a Lab library folder, keeping its vanilla KV block key. At load, last-wins makes your copy replace the shipped ability everywhere -- vanilla units, campaign, and every Lab character that uses it. The folder itself still gets its own minted id. Not yet openable from File -> Edit Vanilla Ability... -- open it from the library like any other ability.
+
+## ability.vanilla.CopyFork
+Copy into Library (Fork)
+Copies this ability into a Lab library folder under a newly minted id. Vanilla is untouched; only Lab characters you separately assign this new id to are affected.

@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using LokrAbilityLab;
 using LokrAbilityLab.Editor;
 using LokrLab.Shell;
+using LokrLabApi;
 using SimpleUI;
 using UnityEngine;
 
@@ -26,6 +28,8 @@ namespace LokrAbilityLab.Projects
 		private static UiLabel listEmptyLabel;
 		private static UiLabel detailTitle;
 		private static UiStack detailBody;
+		private static UiLabel copyStatusLabel;
+		private static AbilityFileModel detailModel;
 
 		/// <summary>Shows the searchable list of shipped abilities.</summary>
 		internal static void Show()
@@ -106,6 +110,20 @@ namespace LokrAbilityLab.Projects
 			detailBody = UiStack.Vertical(root.ContentTransform, theme, spacing: 6f, padding: 0f, scrollable: true);
 			root.Add(detailBody.Grow());
 
+			UiStack copyRow = UiStack.Horizontal(root.ContentTransform, theme, spacing: 8f, padding: 0f);
+			root.Add(copyRow.FixedHeight(32f));
+			UiButton copyOverride = UiButton.Create(copyRow.ContentTransform, "Copy into Library (Override)",
+				() => CopyIntoLibrary(VanillaAbilityImportMode.Override), theme, primary: false);
+			copyRow.Add(copyOverride.Grow());
+			LabHoverInfo.Bind(copyOverride.GameObject, "ability.vanilla.CopyOverride");
+			UiButton copyFork = UiButton.Create(copyRow.ContentTransform, "Copy into Library (Fork)",
+				() => CopyIntoLibrary(VanillaAbilityImportMode.Fork), theme, primary: false);
+			copyRow.Add(copyFork.Grow());
+			LabHoverInfo.Bind(copyFork.GameObject, "ability.vanilla.CopyFork");
+
+			copyStatusLabel = UiLabel.Create(root.ContentTransform, string.Empty, theme, 11, TextAnchor.UpperLeft);
+			root.Add(copyStatusLabel.FixedHeight(20f));
+
 			return root;
 		}
 
@@ -164,8 +182,58 @@ namespace LokrAbilityLab.Projects
 		{
 			listRoot.Visible(false);
 			detailRoot.Visible(true);
+			detailModel = model;
 			detailTitle.SetText(model.Id);
+			copyStatusLabel.SetText(string.Empty);
 			BuildDetailBody(model);
+		}
+
+		private static void CopyIntoLibrary(VanillaAbilityImportMode mode)
+		{
+			if (detailModel == null)
+			{
+				return;
+			}
+
+			string library = ResolveTargetLibrary();
+			if (string.IsNullOrEmpty(library))
+			{
+				copyStatusLabel.SetText("Could not find or create a library to copy into.");
+				return;
+			}
+
+			if (!VanillaAbilityImporter.TryImport(detailModel.Id, library, mode, out string newFolder, out string error))
+			{
+				copyStatusLabel.SetText(error ?? "Copy failed.");
+				return;
+			}
+
+			LokrLabApi.LokrLabApi.RequestRefresh();
+			copyStatusLabel.SetText("Copied to " + newFolder + ".");
+		}
+
+		/// <summary>The open ability library, else the first existing one, else a newly minted "Vanilla Imports" library.</summary>
+		private static string ResolveTargetLibrary()
+		{
+			ProjectSession session = LokrLabApi.LokrLabApi.CurrentSession;
+			if (session != null && session.ProjectTypeId == LokrLabApi.LokrLabApi.AbilityLibraryTypeId
+				&& !string.IsNullOrEmpty(session.FolderPath))
+			{
+				return session.FolderPath;
+			}
+
+			string first = AbilityLabPaths.FirstLibraryFolder();
+			if (!string.IsNullOrEmpty(first))
+			{
+				return first;
+			}
+
+			AbilityLabPaths.EnsureFoldersExist();
+			string id = AbilityLabPaths.GenerateNewLibraryId("vanilla_imports");
+			string created = AbilityLabPaths.LibraryFolder(id);
+			System.IO.Directory.CreateDirectory(created);
+			AbilityLibrarySession.WriteMarker(created, "Vanilla Imports");
+			return created;
 		}
 
 		private static void BuildDetailBody(AbilityFileModel model)

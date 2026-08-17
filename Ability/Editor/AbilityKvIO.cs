@@ -89,10 +89,12 @@ namespace LokrAbilityLab.Editor
 			};
 		}
 
-		/// <summary>Parses every top-level ability block in raw KV text. Blocks that fail to parse are skipped and reported in errors rather than thrown, so one bad block doesn't drop the rest of a multi-block asset.</summary>
-		internal static List<AbilityFileModel> LoadAllFromText(string text, string sourceLabel, out List<string> errors)
+		/// <summary>Parses every top-level ability block in raw KV text, also returning each block's own source text keyed by id. Blocks that fail to parse are skipped and reported in errors rather than thrown, so one bad block doesn't drop the rest of a multi-block asset.</summary>
+		/// <remarks>rawTextById exists so a caller can write a block back out close to verbatim (KeyValue.ToString(0)) instead of round-tripping through TryBuildText, which is lossy -- see VanillaAbilityImporter, which needs this for copying a vanilla ability into a Lab library folder.</remarks>
+		internal static List<AbilityFileModel> LoadAllFromText(string text, string sourceLabel, out Dictionary<string, string> rawTextById, out List<string> errors)
 		{
 			errors = new List<string>();
+			rawTextById = new Dictionary<string, string>();
 			List<AbilityFileModel> models = new List<AbilityFileModel>();
 			KeyValue[] roots;
 			try
@@ -109,7 +111,9 @@ namespace LokrAbilityLab.Editor
 			{
 				try
 				{
-					models.Add(LoadFromKeyValue(root, sourceLabel));
+					AbilityFileModel model = LoadFromKeyValue(root, sourceLabel);
+					models.Add(model);
+					rawTextById[model.Id] = root.ToString(0);
 				}
 				catch (Exception ex)
 				{

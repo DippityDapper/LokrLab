@@ -355,6 +355,8 @@ namespace LokrAbilityLab.Editor
 			Add("encounter.terrain.Remove", "Remove Terrain", "Drops an import or custom row. Host template rows come back on the next scan.");
 			Add("ability.vanilla.Browse", "Browse Vanilla Abilities", "Read-only reference over every shipped ability, parsed live from the game's own data. Does not open, copy, or edit anything.");
 			Add("ability.vanilla.OverrideVsFork", "Override vs Fork", "Override would replace a shipped ability's id everywhere it's used -- one ability, global. Fork mints a new id so only wired Lab characters are affected; vanilla is untouched. Neither is available yet -- this browser is research only.");
+			Add("ability.vanilla.CopyOverride", "Copy into Library (Override)", "Copies this ability into a Lab library folder, keeping its vanilla KV block key so last-wins replaces it everywhere at load. Not yet openable from an Edit Vanilla Ability button -- open it from the library like any other ability.");
+			Add("ability.vanilla.CopyFork", "Copy into Library (Fork)", "Copies this ability into a Lab library folder under a newly minted id. Vanilla is untouched; only Lab characters you separately assign this new id to are affected.");
 			Add("sandbox.Level", "Sandbox Level", "Always Level 1, 2, or 3. Sets the hero rank for this Sandbox run.");
 			Add("sandbox.Start", "Start sandbox", "Plays the open encounter, or a 1v1 in Character / Ability. Same Sandbox hole everywhere.");
 			Add("encounter.combatant.Side", "Side", "GoodSide (player) or BadSide (AI). Sandbox refuses zero GoodSide. OwnSide is not v1.");

@@ -22,6 +22,7 @@ namespace LokrAbilityLab.Editor
 	internal static class VanillaAbilityCatalog
 	{
 		private static List<AbilityFileModel> cache;
+		private static Dictionary<string, string> sourceTextById;
 
 		/// <summary>Every shipped ability, sorted by id. Built once and cached; call Refresh() to force a re-read.</summary>
 		internal static IReadOnlyList<AbilityFileModel> All()
@@ -38,6 +39,7 @@ namespace LokrAbilityLab.Editor
 		internal static void Refresh()
 		{
 			List<AbilityFileModel> models = new List<AbilityFileModel>();
+			Dictionary<string, string> rawTextById = new Dictionary<string, string>();
 			AbilitiesDefinitions instance = AbilitiesDefinitions.instance;
 			string abilitiesFolder = instance != null
 				? Traverse.Create(instance).Field<string>("abilitiesFolder").Value
@@ -47,14 +49,20 @@ namespace LokrAbilityLab.Editor
 			{
 				foreach (TextAsset asset in ResourcesWrapper.LoadAll<TextAsset>(abilitiesFolder))
 				{
-					List<AbilityFileModel> parsed = AbilityKvIO.LoadAllFromText(asset.text, asset.name, out _);
+					List<AbilityFileModel> parsed = AbilityKvIO.LoadAllFromText(asset.text, asset.name, out Dictionary<string, string> assetRawText, out _);
 					models.AddRange(parsed);
+					foreach (KeyValuePair<string, string> pair in assetRawText)
+					{
+						rawTextById[pair.Key] = pair.Value;
+					}
+
 					Resources.UnloadAsset(asset);
 				}
 			}
 
 			models.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
 			cache = models;
+			sourceTextById = rawTextById;
 		}
 
 		/// <summary>Finds one shipped ability by id, or null.</summary>
@@ -74,6 +82,18 @@ namespace LokrAbilityLab.Editor
 			}
 
 			return null;
+		}
+
+		/// <summary>The shipped ability's own KV block source text (KeyValue.ToString(0)), or null. Used to copy it into a Lab library folder close to verbatim -- see VanillaAbilityImporter.</summary>
+		internal static string FindSourceText(string id)
+		{
+			if (string.IsNullOrEmpty(id))
+			{
+				return null;
+			}
+
+			All();
+			return sourceTextById != null && sourceTextById.TryGetValue(id, out string text) ? text : null;
 		}
 	}
 }
