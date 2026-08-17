@@ -78,6 +78,7 @@ namespace LokrLab.Encounter
 			EncounterEdit.ApplyAuthoredBoard(stage, file);
 			EncounterTiles.ApplyAuthoredTiles(file);
 			EncounterProps.Apply(file);
+			EncounterDecorations.Apply(file);
 			EncounterCombatantModel firstGood = EncounterPlayRules.FirstGoodSide(file);
 			HashSet<string> occupied = new HashSet<string>(StringComparer.Ordinal);
 			int goodUnset = 0;

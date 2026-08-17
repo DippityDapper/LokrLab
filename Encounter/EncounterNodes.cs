@@ -33,6 +33,12 @@ namespace LokrLab.Encounter
 		/// <summary>One authored prop instance.</summary>
 		internal const string PropKind = "EncounterProp";
 
+		/// <summary>Folder that holds decorative (non-combat) unit children.</summary>
+		internal const string DecorationsKind = "EncounterDecorations";
+
+		/// <summary>One authored decorative unit row.</summary>
+		internal const string DecorationKind = "EncounterDecoration";
+
 		/// <summary>Folder that holds painted trigger-region children.</summary>
 		internal const string TriggersKind = "EncounterTriggers";
 
@@ -98,6 +104,7 @@ namespace LokrLab.Encounter
 			root.Children.Add(folder);
 			root.Children.Add(ContributeTerrains(encounter));
 			root.Children.Add(ContributeProps(encounter));
+			root.Children.Add(ContributeDecorations(encounter));
 			root.Children.Add(ContributeTriggers(encounter));
 			root.Children.Add(ContributeSpawnPoints(encounter));
 			yield return root;
@@ -121,6 +128,12 @@ namespace LokrLab.Encounter
 		internal static string PropsFolderId(EncounterSession encounter)
 		{
 			return encounter == null ? null : "encounter-props:" + encounter.Id;
+		}
+
+		/// <summary>Node Tree id for the Decorations folder.</summary>
+		internal static string DecorationsFolderId(EncounterSession encounter)
+		{
+			return encounter == null ? null : "encounter-decorations:" + encounter.Id;
 		}
 
 		/// <summary>Node Tree id for the Triggers folder.</summary>
@@ -183,6 +196,18 @@ namespace LokrLab.Encounter
 			LokrLabApi.LokrLabApi.Host.SelectNodeById(PropsFolderId(encounter));
 		}
 
+		/// <summary>Selects the Decorations folder.</summary>
+		internal static void FocusDecorationsFolder(EncounterSession encounter)
+		{
+			if (encounter == null || LokrLabApi.LokrLabApi.Host == null
+				|| LokrLabApi.LokrLabApi.Host.SelectNodeById == null)
+			{
+				return;
+			}
+
+			LokrLabApi.LokrLabApi.Host.SelectNodeById(DecorationsFolderId(encounter));
+		}
+
 		/// <summary>Selects the Combatants folder catalogue. The node appears after Add.</summary>
 		internal static LabNode CreateCombatant(LabNode parent, ProjectSession session)
 		{
@@ -201,6 +226,27 @@ namespace LokrLab.Encounter
 		internal static LabNode CreateProp(LabNode parent, ProjectSession session)
 		{
 			FocusPropsFolder(session as EncounterSession);
+			return null;
+		}
+
+		/// <summary>Mints a blank decorative unit row and selects it. No catalogue -- type a unit id in the inspector.</summary>
+		internal static LabNode CreateDecoration(LabNode parent, ProjectSession session)
+		{
+			EncounterSession encounter = session as EncounterSession;
+			if (encounter == null || encounter.File == null)
+			{
+				return null;
+			}
+
+			EncounterDecorationModel decoration = EncounterDecorationRules.Add(encounter.File, string.Empty);
+			if (decoration == null)
+			{
+				LokrLab.Lab.SetStatus("Could not add a decorative unit.");
+				return null;
+			}
+
+			AfterDecorationsChanged(encounter, decoration.Id);
+			LokrLab.Lab.SetStatus("New decoration '" + decoration.Id + "' -- set its unit id and hex below.");
 			return null;
 		}
 
@@ -357,6 +403,25 @@ namespace LokrLab.Encounter
 			}
 
 			LokrLabApi.LokrLabApi.Host.SelectNodeById(PropNodeId(encounter, selectPropId));
+		}
+
+		/// <summary>Marks dirty, rebuilds the tree, and selects the decoration row.</summary>
+		internal static void AfterDecorationsChanged(EncounterSession encounter, string selectDecorationId)
+		{
+			LabSaveUx.MarkDirty();
+			EncounterSetupViewport.Refresh();
+			if (EncounterEdit.IsArmed)
+			{
+				EncounterDecorations.Apply(encounter != null ? encounter.File : null);
+			}
+
+			LokrLabApi.LokrLabApi.RequestRefresh();
+			if (encounter == null || string.IsNullOrEmpty(selectDecorationId) || LokrLabApi.LokrLabApi.Host == null)
+			{
+				return;
+			}
+
+			LokrLabApi.LokrLabApi.Host.SelectNodeById(DecorationNodeId(encounter, selectDecorationId));
 		}
 
 		/// <summary>Marks dirty, rebuilds the tree, and selects the terrain row.</summary>
@@ -1083,6 +1148,162 @@ namespace LokrLab.Encounter
 			LabHoverInfo.Bind(section.GameObject, "encounter.prop.Remove");
 		}
 
+		/// <summary>Decorations folder: count, Add.</summary>
+		internal static void DrawDecorations(LabNode node, ProjectSession session, Transform contentParent)
+		{
+			EncounterSession encounter = session as EncounterSession;
+			UiTheme theme = UiTheme.Default;
+			UiStack section = UiStack.Vertical(contentParent, theme, spacing: 6f, padding: 0f);
+			section.Add(UiLabel.Create(section.ContentTransform, "Decorations", theme, theme.TitleFontSize)
+				.FixedHeight(26f));
+			int total = encounter != null && encounter.File != null && encounter.File.Decorations != null
+				? encounter.File.Decorations.Count
+				: 0;
+			section.Add(UiLabel.Create(section.ContentTransform,
+				total + " decoration" + (total == 1 ? "" : "s")
+				+ ". Ambient units with a rig and idle animation that never join the fight -- villagers, farmers, and the like. Not a Combatant (no side, no initiative) and not a Prop (real unit, not a static mesh).",
+				theme, 11, TextAnchor.UpperLeft).FixedHeight(64f));
+			section.Add(UiButton.Create(section.ContentTransform, "Add Decorative Unit",
+				() => CreateDecoration(node, encounter), theme, primary: true).FixedHeight(28f));
+			LabHoverInfo.Bind(section.GameObject, "encounter.decorations.Add");
+		}
+
+		/// <summary>One decorative unit: unit id, hex, facing, remove.</summary>
+		internal static void DrawDecoration(LabNode node, ProjectSession session, Transform contentParent)
+		{
+			EncounterSession encounter = session as EncounterSession;
+			EncounterDecorationModel decoration = node != null ? node.Payload as EncounterDecorationModel : null;
+			UiTheme theme = UiTheme.Default;
+			UiStack section = UiStack.Vertical(contentParent, theme, spacing: 6f, padding: 0f);
+			section.Add(UiLabel.Create(section.ContentTransform,
+				decoration != null ? LabelFor(decoration) : "Decoration", theme, theme.TitleFontSize)
+				.FixedHeight(26f));
+			if (decoration != null)
+			{
+				LokrLab.LabClipboard.AddIdRow(section, decoration.Id);
+			}
+
+			if (decoration == null || encounter == null || encounter.File == null)
+			{
+				return;
+			}
+
+			section.Add(UiLabel.Create(section.ContentTransform, "Unit id", theme, 13).FixedHeight(20f));
+			UiComboBox unitField = UiComboBox.Create(section.ContentTransform, AbilityCatalogLookupsSafe(),
+				decoration.UnitId, theme);
+			section.Add(unitField.FixedHeight(28f));
+			LabHoverInfo.Bind(unitField.GameObject, "encounter.decoration.UnitId");
+			unitField.OnEndEdit(value =>
+			{
+				string unitId = (value ?? string.Empty).Trim();
+				if (unitId == decoration.UnitId)
+				{
+					return;
+				}
+
+				decoration.UnitId = unitId;
+				AfterDecorationsChanged(encounter, decoration.Id);
+			});
+
+			DrawDecorationPlacementFields(section, encounter, decoration, theme);
+
+			section.Add(UiLabel.Create(section.ContentTransform, "Facing", theme, 13).FixedHeight(20f));
+			UiToggle flip = UiToggle.Create(section.ContentTransform, "Flipped", decoration.Flipped, theme);
+			flip.OnValueChanged(value =>
+			{
+				if (value == decoration.Flipped)
+				{
+					return;
+				}
+
+				decoration.Flipped = value;
+				AfterDecorationsChanged(encounter, decoration.Id);
+			});
+			section.Add(flip.FixedHeight(28f));
+			LabHoverInfo.Bind(flip.GameObject, "encounter.decoration.Flipped");
+
+			section.Add(UiButton.Create(section.ContentTransform, "Clear placement", () =>
+			{
+				EncounterDecorationRules.ClearPlacement(decoration);
+				AfterDecorationsChanged(encounter, decoration.Id);
+			}, theme, primary: false).FixedHeight(28f));
+			LabHoverInfo.Bind(section.GameObject, "encounter.decoration.Clear");
+
+			section.Add(UiButton.Create(section.ContentTransform, "Remove Decoration", () =>
+			{
+				if (!EncounterDecorationRules.Remove(encounter.File, decoration.Id))
+				{
+					return;
+				}
+
+				AfterDecorationsChanged(encounter, null);
+			}, theme, primary: false).FixedHeight(28f));
+			LabHoverInfo.Bind(section.GameObject, "encounter.decoration.Remove");
+		}
+
+		private static void DrawDecorationPlacementFields(
+			UiStack section,
+			EncounterSession encounter,
+			EncounterDecorationModel decoration,
+			UiTheme theme)
+		{
+			EncounterPlacementRules.LiveSize(encounter.File, out int width, out int height);
+			section.Add(UiLabel.Create(section.ContentTransform,
+				"Hex (live " + width + "×" + height + "; empty = not on the board)",
+				theme, 13).FixedHeight(20f));
+			UiStack hexRow = UiStack.Horizontal(section.ContentTransform, theme, spacing: 8f, padding: 0f);
+			hexRow.Add(UiLabel.Create(hexRow.ContentTransform, "Col", theme, 13).FixedWidth(28f));
+			UiTextField colField = UiTextField.Create(hexRow.ContentTransform,
+				decoration.Col.HasValue ? decoration.Col.Value.ToString() : string.Empty, theme);
+			hexRow.Add(colField.Grow());
+			hexRow.Add(UiLabel.Create(hexRow.ContentTransform, "Row", theme, 13).FixedWidth(32f));
+			UiTextField rowField = UiTextField.Create(hexRow.ContentTransform,
+				decoration.Row.HasValue ? decoration.Row.Value.ToString() : string.Empty, theme);
+			hexRow.Add(rowField.Grow());
+			section.Add(hexRow.FixedHeight(28f));
+			LabHoverInfo.Bind(colField.GameObject, "encounter.decoration.Col");
+			LabHoverInfo.Bind(rowField.GameObject, "encounter.decoration.Row");
+			colField.OnEndEdit(value => ApplyDecorationCoord(encounter, decoration, value, isCol: true));
+			rowField.OnEndEdit(value => ApplyDecorationCoord(encounter, decoration, value, isCol: false));
+		}
+
+		private static void ApplyDecorationCoord(
+			EncounterSession encounter,
+			EncounterDecorationModel decoration,
+			string text,
+			bool isCol)
+		{
+			int? parsed;
+			if (!EncounterPlacementRules.TryParseCoord(text, out parsed))
+			{
+				return;
+			}
+
+			EncounterPlacementRules.LiveSize(encounter.File, out int width, out int height);
+			int? nextCol = decoration.Col;
+			int? nextRow = decoration.Row;
+			if (isCol)
+			{
+				nextCol = parsed.HasValue ? EncounterPlacementRules.ClampCoord(parsed.Value, width) : (int?)null;
+				if (nextCol.HasValue && !nextRow.HasValue)
+				{
+					nextRow = height / 2;
+				}
+			}
+			else
+			{
+				nextRow = parsed.HasValue ? EncounterPlacementRules.ClampCoord(parsed.Value, height) : (int?)null;
+				if (nextRow.HasValue && !nextCol.HasValue)
+				{
+					nextCol = width / 2;
+				}
+			}
+
+			decoration.Col = nextCol;
+			decoration.Row = nextRow;
+			AfterDecorationsChanged(encounter, decoration.Id);
+		}
+
 		/// <summary>Fallback Combatants folder drawer. The persistent catalogue host usually wins.</summary>
 		internal static void DrawCombatants(LabNode node, ProjectSession session, Transform contentParent)
 		{
@@ -1724,6 +1945,42 @@ namespace LokrLab.Encounter
 			return folder;
 		}
 
+		private static LabNode ContributeDecorations(EncounterSession encounter)
+		{
+			LabNode folder = new LabNode
+			{
+				Id = "encounter-decorations:" + encounter.Id,
+				DisplayName = "Decorations",
+				Kind = DecorationsKind,
+				IconKey = "Enc",
+				Payload = encounter
+			};
+			if (encounter.File == null || encounter.File.Decorations == null)
+			{
+				return folder;
+			}
+
+			for (int i = 0; i < encounter.File.Decorations.Count; i++)
+			{
+				EncounterDecorationModel decoration = encounter.File.Decorations[i];
+				if (decoration == null || string.IsNullOrEmpty(decoration.Id))
+				{
+					continue;
+				}
+
+				folder.Children.Add(new LabNode
+				{
+					Id = DecorationNodeId(encounter, decoration.Id),
+					DisplayName = LabelFor(decoration),
+					Kind = DecorationKind,
+					IconKey = "Enc",
+					Payload = decoration
+				});
+			}
+
+			return folder;
+		}
+
 		private static void DrawPropPlacementFields(
 			UiStack section,
 			EncounterSession encounter,
@@ -1938,6 +2195,12 @@ namespace LokrLab.Encounter
 			return "encounter-prop:" + encounter.Id + ":" + propId;
 		}
 
+		/// <summary>Node Tree id for one decoration row in this encounter.</summary>
+		internal static string DecorationNodeId(EncounterSession encounter, string decorationId)
+		{
+			return "encounter-decoration:" + encounter.Id + ":" + decorationId;
+		}
+
 		private static string LabelFor(EncounterCombatantModel combatant)
 		{
 			if (combatant == null)
@@ -1994,6 +2257,16 @@ namespace LokrLab.Encounter
 			}
 
 			return prop.Id;
+		}
+
+		private static string LabelFor(EncounterDecorationModel decoration)
+		{
+			if (decoration == null)
+			{
+				return "Decoration";
+			}
+
+			return string.IsNullOrEmpty(decoration.UnitId) ? decoration.Id : decoration.UnitId;
 		}
 	}
 }

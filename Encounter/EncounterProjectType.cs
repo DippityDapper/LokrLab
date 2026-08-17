@@ -33,6 +33,8 @@ namespace LokrLab.Encounter
 				EncounterNodes.CreateTerrain);
 			registration.RegisterNodeFactory(EncounterNodes.PropKind, new[] { EncounterNodes.PropsKind },
 				EncounterNodes.CreateProp);
+			registration.RegisterNodeFactory(EncounterNodes.DecorationKind, new[] { EncounterNodes.DecorationsKind },
+				EncounterNodes.CreateDecoration);
 			registration.RegisterNodeFactory(EncounterNodes.TriggerKind, new[] { EncounterNodes.TriggersKind },
 				EncounterNodes.CreateTrigger);
 			registration.RegisterNodeFactory(EncounterNodes.SpawnPointKind, new[] { EncounterNodes.SpawnPointsKind },
@@ -44,6 +46,8 @@ namespace LokrLab.Encounter
 			registration.RegisterInspectorDrawer(EncounterNodes.TerrainKind, EncounterNodes.DrawTerrain);
 			registration.RegisterInspectorDrawer(EncounterNodes.PropsKind, EncounterNodes.DrawProps);
 			registration.RegisterInspectorDrawer(EncounterNodes.PropKind, EncounterNodes.DrawProp);
+			registration.RegisterInspectorDrawer(EncounterNodes.DecorationsKind, EncounterNodes.DrawDecorations);
+			registration.RegisterInspectorDrawer(EncounterNodes.DecorationKind, EncounterNodes.DrawDecoration);
 			registration.RegisterInspectorDrawer(EncounterNodes.TriggersKind, EncounterNodes.DrawTriggers);
 			registration.RegisterInspectorDrawer(EncounterNodes.TriggerKind, EncounterNodes.DrawTrigger);
 			registration.RegisterInspectorDrawer(EncounterNodes.SpawnPointsKind, EncounterNodes.DrawSpawnPoints);
@@ -76,11 +80,13 @@ namespace LokrLab.Encounter
 				isVisible: IsEncounterSession);
 			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Add Prop", PromptAddProp, priority: 7,
 				isVisible: IsEncounterSession);
-			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Add Trigger", PromptAddTrigger, priority: 8,
+			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Add Decorative Unit", PromptAddDecoration, priority: 8,
 				isVisible: IsEncounterSession);
-			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Add Spawn Point", PromptAddSpawnPoint, priority: 9,
+			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Add Trigger", PromptAddTrigger, priority: 9,
 				isVisible: IsEncounterSession);
-			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Import Vanilla Encounter...", VanillaEncounterImportModal.Show, priority: 10);
+			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Add Spawn Point", PromptAddSpawnPoint, priority: 10,
+				isVisible: IsEncounterSession);
+			LokrLabApi.LokrLabApi.RegisterMenuItem("File", "Import Vanilla Encounter...", VanillaEncounterImportModal.Show, priority: 11);
 			registration.RegisterWorkspace(new WorkspaceRegistration
 			{
 				Name = EncounterSetupViewport.WorkspaceName,
@@ -175,6 +181,11 @@ namespace LokrLab.Encounter
 		private static void PromptAddProp()
 		{
 			EncounterNodes.FocusPropsFolder(LokrLabApi.LokrLabApi.CurrentSession as EncounterSession);
+		}
+
+		private static void PromptAddDecoration()
+		{
+			EncounterNodes.CreateDecoration(null, LokrLabApi.LokrLabApi.CurrentSession);
 		}
 
 		private static void PromptAddTrigger()

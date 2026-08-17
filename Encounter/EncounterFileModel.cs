@@ -166,6 +166,34 @@ namespace LokrLab.Encounter
 		internal bool Flipped;
 	}
 
+	/// <summary>One decorative (non-combat) unit in <c>encounter.json</c>.</summary>
+	/// <remarks>
+	/// Spawns with the same rig/animations as a real combatant (via <c>SandboxRoster.SpawnAt</c>),
+	/// but flagged <c>NON_TARGETABLE</c> / <c>NOT_IN_INITIATIVE_BAR</c> / <c>IS_CINEMATIC</c> and
+	/// <c>UnitGroup.CinematicSide</c>, mirroring vanilla's own <c>EncounterDefinition.CreateUnit</c>
+	/// for <c>spawnDataCinematicUnits</c> entries -- ambient NPCs (villagers, farmers) that stand
+	/// on the board but never join the fight. Distinct from <see cref="EncounterPropModel"/> (a
+	/// static mesh with no rig) and from <see cref="EncounterCombatantModel"/> (joins initiative,
+	/// counted for win/loss).
+	/// </remarks>
+	internal sealed class EncounterDecorationModel
+	{
+		/// <summary>Unique legal slug inside this encounter.</summary>
+		internal string Id = string.Empty;
+
+		/// <summary>Vanilla or loaded unit id. Empty means the row is listed but does not spawn.</summary>
+		internal string UnitId = string.Empty;
+
+		/// <summary>Optional board column. Null means the row is listed but not on the board.</summary>
+		internal int? Col;
+
+		/// <summary>Optional board row. Null means the row is listed but not on the board.</summary>
+		internal int? Row;
+
+		/// <summary>Facing. Default false.</summary>
+		internal bool Flipped;
+	}
+
 	/// <summary>Typed <c>encounter.json</c> payload. Unity-free so xUnit can round-trip it.</summary>
 	/// <remarks>
 	/// Display name stays on <c>project.json</c>. Schema v2 adds sparse walkability overrides.
@@ -192,7 +220,11 @@ namespace LokrLab.Encounter
 	/// v13 adds combatant source <c>spawn</c> — a GoodSide hex position
 	/// with no fixed Character/unit, filled at load time by whoever
 	/// spawns into the encounter (Sandbox, later Adventures). v1–v12
-	/// files still load (no spawn rows existed before).
+	/// files still load (no spawn rows existed before). Schema v14 adds
+	/// <c>decorations</c> — ambient, non-combat units (rig + animation,
+	/// but never join initiative), separate from both <see cref="Props"/>
+	/// (static mesh) and <see cref="Combatants"/> (joins the fight).
+	/// Missing key on v1–v13 files means no decorations.
 	/// </remarks>
 	internal sealed class EncounterFileModel
 	{
@@ -200,7 +232,7 @@ namespace LokrLab.Encounter
 		internal const string FileName = "encounter.json";
 
 		/// <summary>Current authored schema.</summary>
-		internal const int CurrentSchemaVersion = 13;
+		internal const int CurrentSchemaVersion = 14;
 
 		/// <summary>Fallback per-unit aggro radius (hexes) when neither the combatant nor the file overrides it.</summary>
 		internal const int DefaultAggroRadiusValue = 4;
@@ -245,6 +277,7 @@ namespace LokrLab.Encounter
 		private static readonly Regex TilesPattern = new Regex("\"tiles\"\\s*:\\s*\\[");
 		private static readonly Regex TerrainsPattern = new Regex("\"terrains\"\\s*:\\s*\\[");
 		private static readonly Regex PropsPattern = new Regex("\"props\"\\s*:\\s*\\[");
+		private static readonly Regex DecorationsPattern = new Regex("\"decorations\"\\s*:\\s*\\[");
 		private static readonly Regex TriggersPattern = new Regex("\"triggers\"\\s*:\\s*\\[");
 		private static readonly Regex TriggerCellsPattern = new Regex("\"triggerCells\"\\s*:\\s*\\[");
 		private static readonly Regex CameraPattern = new Regex("\"camera\"\\s*:\\s*\\{");
@@ -254,7 +287,7 @@ namespace LokrLab.Encounter
 		private static readonly Regex ObjectBoolPattern = new Regex("\"([A-Za-z][A-Za-z0-9_]*)\"\\s*:\\s*(true|false)");
 		private static readonly Regex LegalIdPattern = new Regex("^[a-z][a-z0-9_]*$");
 
-		/// <summary>File schema version. v13 adds combatant source <c>spawn</c> (on top of v12's trigger catalog / triggerCells / triggerId and v10's exploration / defaultAggroRadius / pocket / aggroRadius). v1–v12 still load; v11 does not migrate.</summary>
+		/// <summary>File schema version. v14 adds <c>decorations</c> (on top of v13's spawn-source combatants, v12's trigger catalog / triggerCells / triggerId, and v10's exploration / defaultAggroRadius / pocket / aggroRadius). v1–v13 still load; v11 does not migrate.</summary>
 		internal int SchemaVersion = CurrentSchemaVersion;
 
 		/// <summary>Arena prefab name loaded by the fight embed.</summary>
@@ -292,6 +325,9 @@ namespace LokrLab.Encounter
 
 		/// <summary>Authored scenario deco instances. Empty is legal.</summary>
 		internal List<EncounterPropModel> Props = new List<EncounterPropModel>();
+
+		/// <summary>Authored ambient non-combat units. Empty is legal.</summary>
+		internal List<EncounterDecorationModel> Decorations = new List<EncounterDecorationModel>();
 
 		/// <summary>Trigger catalog for the Node Tree. Empty means no triggers.</summary>
 		internal List<EncounterTriggerModel> Triggers = new List<EncounterTriggerModel>();
@@ -417,6 +453,28 @@ namespace LokrLab.Encounter
 			return null;
 		}
 
+		/// <summary>Validates one decoration. Returns an error, or null when the row is legal.</summary>
+		/// <remarks>An empty <c>UnitId</c> is legal (a freshly-minted row with nothing typed yet) — <see cref="EncounterDecorations"/> just skips spawning it.</remarks>
+		internal static string ValidateDecoration(EncounterDecorationModel decoration, ICollection<string> usedIds)
+		{
+			if (decoration == null)
+			{
+				return "Decoration is missing.";
+			}
+
+			if (string.IsNullOrEmpty(decoration.Id) || !LegalIdPattern.IsMatch(decoration.Id))
+			{
+				return "Decoration id must be a legal slug.";
+			}
+
+			if (usedIds != null && usedIds.Contains(decoration.Id))
+			{
+				return "Decoration id '" + decoration.Id + "' is already used.";
+			}
+
+			return null;
+		}
+
 		/// <summary>Parses <c>encounter.json</c> text. Invalid combatant rows are skipped.</summary>
 		internal static bool TryParse(string json, out EncounterFileModel model, out string error)
 		{
@@ -489,6 +547,12 @@ namespace LokrLab.Encounter
 				return false;
 			}
 
+			List<EncounterDecorationModel> decorations = new List<EncounterDecorationModel>();
+			if (!TryParseObjectArray(json, DecorationsPattern, ParseDecoration, decorations, "decorations", out error))
+			{
+				return false;
+			}
+
 			if (!TryParseObjectArray(json, TriggersPattern, ParseTriggerModel, model.Triggers, "triggers", out error))
 			{
 				return false;
@@ -530,6 +594,18 @@ namespace LokrLab.Encounter
 
 				used.Add(combatant.Id);
 				model.Combatants.Add(combatant);
+			}
+
+			for (int i = 0; i < decorations.Count; i++)
+			{
+				EncounterDecorationModel decoration = decorations[i];
+				if (ValidateDecoration(decoration, used) != null)
+				{
+					continue;
+				}
+
+				used.Add(decoration.Id);
+				model.Decorations.Add(decoration);
 			}
 
 			return true;
@@ -614,6 +690,25 @@ namespace LokrLab.Encounter
 				{
 					AppendProp(json, Props[i]);
 					if (i + 1 < Props.Count)
+					{
+						json.Append(',');
+					}
+
+					json.Append('\n');
+				}
+
+				json.Append("  ");
+			}
+
+			json.Append("],\n");
+			json.Append("  \"decorations\": [");
+			if (Decorations != null && Decorations.Count > 0)
+			{
+				json.Append('\n');
+				for (int i = 0; i < Decorations.Count; i++)
+				{
+					AppendDecoration(json, Decorations[i]);
+					if (i + 1 < Decorations.Count)
 					{
 						json.Append(',');
 					}
@@ -742,7 +837,7 @@ namespace LokrLab.Encounter
 			}
 		}
 
-		/// <summary>Ids already used in <see cref="Combatants"/> and <see cref="Props"/>.</summary>
+		/// <summary>Ids already used in <see cref="Combatants"/>, <see cref="Props"/>, and <see cref="Decorations"/>.</summary>
 		internal HashSet<string> UsedIds()
 		{
 			HashSet<string> used = new HashSet<string>(StringComparer.Ordinal);
@@ -764,6 +859,17 @@ namespace LokrLab.Encounter
 					if (Props[i] != null && !string.IsNullOrEmpty(Props[i].Id))
 					{
 						used.Add(Props[i].Id);
+					}
+				}
+			}
+
+			if (Decorations != null)
+			{
+				for (int i = 0; i < Decorations.Count; i++)
+				{
+					if (Decorations[i] != null && !string.IsNullOrEmpty(Decorations[i].Id))
+					{
+						used.Add(Decorations[i].Id);
 					}
 				}
 			}
@@ -1265,6 +1371,76 @@ namespace LokrLab.Encounter
 			}
 
 			json.Append(", \"flipped\": ").Append(prop.Flipped ? "true" : "false")
+				.Append(" }");
+		}
+
+		private static EncounterDecorationModel ParseDecoration(string block)
+		{
+			EncounterDecorationModel decoration = new EncounterDecorationModel();
+			foreach (Match match in ObjectStringPattern.Matches(block))
+			{
+				string key = match.Groups[1].Value;
+				string value = Unescape(match.Groups[2].Value);
+				if (key == "id")
+				{
+					decoration.Id = value;
+				}
+				else if (key == "unitId")
+				{
+					decoration.UnitId = value;
+				}
+			}
+
+			foreach (Match match in ObjectIntPattern.Matches(block))
+			{
+				string key = match.Groups[1].Value;
+				int value;
+				if (!int.TryParse(match.Groups[2].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out value))
+				{
+					continue;
+				}
+
+				if (key == "col")
+				{
+					decoration.Col = value;
+				}
+				else if (key == "row")
+				{
+					decoration.Row = value;
+				}
+			}
+
+			foreach (Match match in ObjectBoolPattern.Matches(block))
+			{
+				if (match.Groups[1].Value == "flipped")
+				{
+					decoration.Flipped = match.Groups[2].Value == "true";
+				}
+			}
+
+			return decoration;
+		}
+
+		private static void AppendDecoration(StringBuilder json, EncounterDecorationModel decoration)
+		{
+			if (decoration == null)
+			{
+				return;
+			}
+
+			json.Append("    { \"id\": \"").Append(TextEscaping.JsonEscape(decoration.Id ?? string.Empty)).Append('"')
+				.Append(", \"unitId\": \"").Append(TextEscaping.JsonEscape(decoration.UnitId ?? string.Empty)).Append('"');
+			if (decoration.Col.HasValue)
+			{
+				json.Append(", \"col\": ").Append(decoration.Col.Value);
+			}
+
+			if (decoration.Row.HasValue)
+			{
+				json.Append(", \"row\": ").Append(decoration.Row.Value);
+			}
+
+			json.Append(", \"flipped\": ").Append(decoration.Flipped ? "true" : "false")
 				.Append(" }");
 		}
 

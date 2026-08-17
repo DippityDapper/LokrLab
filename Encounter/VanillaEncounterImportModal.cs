@@ -123,9 +123,9 @@ namespace LokrLab.Encounter
 			LokrLabApi.LokrLabApi.RequestRefresh();
 			statusLabel.SetText(string.Format(
 				System.Globalization.CultureInfo.InvariantCulture,
-				"Imported to {0}. {1} hero, {2} enemy spawns, {3} props; {4} cinematic dropped, {5} gated, {6} out of bounds.",
+				"Imported to {0}. {1} hero, {2} enemy spawns, {3} props, {4} decorations; {5} gated, {6} out of bounds.",
 				result.Folder, result.HeroesImported, result.EnemiesImported, result.PropsImported,
-				result.CinematicDropped, result.GatedFlagged, result.OutOfBounds));
+				result.CinematicImported, result.GatedFlagged, result.OutOfBounds));
 
 			foreach (string warning in result.Warnings)
 			{
@@ -134,10 +134,10 @@ namespace LokrLab.Encounter
 
 			LokrLabPlugin.Log.LogInfo(string.Format(
 				System.Globalization.CultureInfo.InvariantCulture,
-				"Vanilla encounter import '{0}' -> {1}: {2} hero, {3} enemy, {4} props ({5} with dropped children, {6} unresolved), {7} cinematic dropped, {8} gated, {9} out of bounds, {10} EncounterDefinition variant(s), {11} Bkg variant(s).",
+				"Vanilla encounter import '{0}' -> {1}: {2} hero, {3} enemy, {4} props ({5} with dropped children, {6} unresolved), {7} decorations, {8} gated, {9} out of bounds, {10} EncounterDefinition variant(s), {11} Bkg variant(s).",
 				templateName, result.Folder, result.HeroesImported, result.EnemiesImported,
 				result.PropsImported, result.PropsWithChildrenFlattened, result.PropsUnresolved,
-				result.CinematicDropped, result.GatedFlagged, result.OutOfBounds,
+				result.CinematicImported, result.GatedFlagged, result.OutOfBounds,
 				result.EncounterDefinitionVariantCount, result.BkgDefinitionVariantCount));
 		}
 

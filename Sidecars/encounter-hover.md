@@ -208,6 +208,34 @@ Drops hex and world placement. The row stays in the Node Tree.
 Remove Prop
 Deletes this instance from the encounter. Does not delete the scenario prefab.
 
+## encounter.decorations.Add
+Add Decorative Unit
+Mints a blank row. No catalogue — type a unit id in the inspector, then set its hex. Ambient units (villagers, farmers) that stand on the board with a real rig and idle animation but never join initiative. Not a Prop (static mesh) and not a Combatant (no side, never counted for win/loss).
+
+## encounter.decoration.UnitId
+Unit id
+Vanilla or loaded definition id. Empty means the row is listed but does not spawn. Suggestions come from the same lookup as a combatant's unit id.
+
+## encounter.decoration.Col
+Decoration col
+Live OffsetCoord column. Empty means the row is listed but not on the board.
+
+## encounter.decoration.Row
+Decoration row
+Live OffsetCoord row. Empty means the row is listed but not on the board.
+
+## encounter.decoration.Flipped
+Decoration flipped
+Facing on the spawned unit.
+
+## encounter.decoration.Clear
+Clear placement
+Drops the hex. The row stays in the Node Tree.
+
+## encounter.decoration.Remove
+Remove Decoration
+Deletes this row from the encounter. Does not despawn a live game unit — only Setup/Sandbox preview instances.
+
 ## encounter.setup.DrawHex
 Draw Hex
 Left-drag paints walkable hexes. Right-drag blocks. Click or drag past the current grid (left) — the hover ghost shows the target hex, and the board grows to that cell in one stroke (cap 64). Occupied hexes refuse paint. Size is derived from walkable hexes; it is not stored.
@@ -254,4 +282,4 @@ Unloads the fight hole. Leaving the workspace also stops.
 
 ## encounter.vanilla.Import
 Import Vanilla Encounter
-Read-only import spike. Reconstructs a shipped combat room's combatants and impassable hexes into a brand-new Lab Encounter project -- vanilla is never touched. Lua, cinematics, and quest-gated variants are not imported; see the log for the full loss-list report.
+Read-only import spike. Reconstructs a shipped combat room's combatants, props, decorative units, walkable hexes, and camera bounds into a brand-new Lab Encounter project -- vanilla is never touched. Lua and quest-gated variants are not imported; see the log for the full loss-list report.

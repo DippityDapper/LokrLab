@@ -61,7 +61,7 @@ namespace LokrLab.Encounter
 			internal string Folder;
 			internal int HeroesImported;
 			internal int EnemiesImported;
-			internal int CinematicDropped;
+			internal int CinematicImported;
 			internal int GatedFlagged;
 			internal int OutOfBounds;
 			internal int EncounterDefinitionVariantCount;
@@ -155,9 +155,7 @@ namespace LokrLab.Encounter
 			HashSet<string> usedIds = new HashSet<string>(StringComparer.Ordinal);
 			ImportSpawns(definition.encounterData.spawnDataHeroes, true, liveWidth, liveHeight, file, usedIds, result);
 			ImportSpawns(definition.encounterData.spawnDataEnemies, false, liveWidth, liveHeight, file, usedIds, result);
-			result.CinematicDropped += definition.encounterData.spawnDataCinematicUnits != null
-				? definition.encounterData.spawnDataCinematicUnits.Count
-				: 0;
+			ImportDecorations(definition.encounterData.spawnDataCinematicUnits, liveWidth, liveHeight, file, usedIds, result);
 			ImportProps(definition.encounterData.encounterObjs, file, usedIds, result);
 
 			if (boardState != null)
@@ -220,13 +218,6 @@ namespace LokrLab.Encounter
 					continue;
 				}
 
-				bool cinematic = data.config != null && data.config.GetBool("isCinematic", null, false);
-				if (cinematic)
-				{
-					result.CinematicDropped++;
-					continue;
-				}
-
 				bool gated = data.config != null
 					&& (!string.IsNullOrEmpty(data.config.GetConfig("notInQuest", null))
 						|| !string.IsNullOrEmpty(data.config.GetConfig("variant-chance", null))
@@ -243,6 +234,13 @@ namespace LokrLab.Encounter
 				if (col < 0 || col >= liveWidth || row < 0 || row >= liveHeight)
 				{
 					result.OutOfBounds++;
+					continue;
+				}
+
+				bool cinematic = data.config != null && data.config.GetBool("isCinematic", null, false);
+				if (cinematic)
+				{
+					AddDecoration(data, col, row, file, usedIds, result);
 					continue;
 				}
 
@@ -277,6 +275,74 @@ namespace LokrLab.Encounter
 
 				file.Combatants.Add(combatant);
 			}
+		}
+
+		/// <summary>Imports EncounterData.spawnDataCinematicUnits -- a separate list from the hero/enemy spawn lists, used by vanilla for ambient NPCs (villagers, farmers) that stand on the board but never fight. Same hex conversion and gating-flag treatment as ImportSpawns; routes through AddDecoration, the same helper an isCinematic-flagged entry inside the hero/enemy lists uses (see ImportSpawns) so both paths land in the same place.</summary>
+		private static void ImportDecorations(
+			List<SpawnUnitData> spawns,
+			int liveWidth,
+			int liveHeight,
+			EncounterFileModel file,
+			HashSet<string> usedIds,
+			ImportResult result)
+		{
+			if (spawns == null)
+			{
+				return;
+			}
+
+			foreach (SpawnUnitData data in spawns)
+			{
+				if (data == null)
+				{
+					continue;
+				}
+
+				bool gated = data.config != null
+					&& (!string.IsNullOrEmpty(data.config.GetConfig("notInQuest", null))
+						|| !string.IsNullOrEmpty(data.config.GetConfig("variant-chance", null))
+						|| !string.IsNullOrEmpty(data.config.GetConfig("variant-quest-context", null)));
+				if (gated)
+				{
+					result.GatedFlagged++;
+				}
+
+				HexCoord cube = FractionalHexCoord.HexRound(Layout.PixelToHex(LiveLayout, data.spawnPos));
+				OffsetCoord live = OffsetCoord.RoffsetFromCube(OffsetCoord.ODD, cube);
+				int col = live.col;
+				int row = live.row;
+				if (col < 0 || col >= liveWidth || row < 0 || row >= liveHeight)
+				{
+					result.OutOfBounds++;
+					continue;
+				}
+
+				AddDecoration(data, col, row, file, usedIds, result);
+			}
+		}
+
+		/// <summary>Appends one decoration row from an already-converted hex position. Shared by ImportDecorations and the isCinematic branch inside ImportSpawns.</summary>
+		private static void AddDecoration(
+			SpawnUnitData data,
+			int col,
+			int row,
+			EncounterFileModel file,
+			HashSet<string> usedIds,
+			ImportResult result)
+		{
+			string idStem = !string.IsNullOrEmpty(data.unitId) ? data.unitId : "decoration";
+			string decorationId = EncounterFileModel.MintCombatantId(idStem, usedIds);
+			usedIds.Add(decorationId);
+
+			file.Decorations.Add(new EncounterDecorationModel
+			{
+				Id = decorationId,
+				UnitId = data.unitId ?? string.Empty,
+				Col = col,
+				Row = row,
+				Flipped = data.flipped,
+			});
+			result.CinematicImported++;
 		}
 
 		/// <summary>Imports EncounterData.encounterObjs (scenery -- barrels, statues, etc; a separate list from the spawn lists) as free-placed, unsnapped props. xPos/yPos are raw local-position data on TemplateObjectData, in the same room-local frame data.spawnPos uses for combatants, so they carry over directly with no hex conversion and no pad adjustment (a continuous world position doesn't need the pad's cell-index shift the way a hex hex Col/Row does). Nested TemplateObjectDataChild entries (a prop's own attached sub-decorations) are not imported -- they're addressed only by a GameObject reference, not a bundle name string, so there is no prefab name to write into EncounterPropModel.PrefabName; entries with children are flagged in the result instead of silently dropping the child detail.</summary>
