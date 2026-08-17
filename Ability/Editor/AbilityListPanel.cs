@@ -148,6 +148,7 @@ namespace LokrAbilityLab.Editor
 		}
 
 		/// <summary>Deletes one ability folder (definition, icons, localization) without touching other abilities.</summary>
+		/// <remarks>Re-derives the folder from abilityId via FindLibraryFolderForAbility, which assumes the folder name equals the id -- true for every Lab-authored ability, but not for a vanilla Override copy (VanillaAbilityImporter mints the folder name while intentionally keeping the vanilla KV block key inside ability.txt). Callers that already know the exact folder (e.g. from AbilityFileModel.SourceFilePath) should call DeleteAbilityFolder directly instead -- see AbilityEditorPanel.OnDeleteClicked.</remarks>
 		internal static void DeleteAbility(string abilityId)
 		{
 			string library = AbilityLabPaths.FindLibraryFolderForAbility(abilityId);
@@ -156,8 +157,13 @@ namespace LokrAbilityLab.Editor
 				return;
 			}
 
-			string folder = AbilityLabPaths.AbilityFolder(library, abilityId);
-			if (Directory.Exists(folder))
+			DeleteAbilityFolder(AbilityLabPaths.AbilityFolder(library, abilityId));
+		}
+
+		/// <summary>Deletes the given ability folder outright, without re-deriving it from an id.</summary>
+		internal static void DeleteAbilityFolder(string folder)
+		{
+			if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder))
 			{
 				Directory.Delete(folder, true);
 			}

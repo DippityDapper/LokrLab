@@ -198,7 +198,7 @@ namespace LokrAbilityLab.Projects
 			string library = ResolveTargetLibrary();
 			if (string.IsNullOrEmpty(library))
 			{
-				copyStatusLabel.SetText("Could not find or create a library to copy into.");
+				copyStatusLabel.SetText("Open (or create) the Ability Library you want to copy into first.");
 				return;
 			}
 
@@ -212,7 +212,13 @@ namespace LokrAbilityLab.Projects
 			copyStatusLabel.SetText("Copied to " + newFolder + ".");
 		}
 
-		/// <summary>The open ability library, else the first existing one, else a newly minted "Vanilla Imports" library.</summary>
+		/// <summary>The currently open ability library, or null.</summary>
+		/// <remarks>
+		/// Deliberately does not fall back to "the first library that happens to exist" or silently
+		/// mint one -- that picked an arbitrary, possibly unrelated library with no way to tell which
+		/// one a copy landed in until after the fact. Requiring an open library makes the target
+		/// explicit: open (or create) the library you want, then copy into it.
+		/// </remarks>
 		private static string ResolveTargetLibrary()
 		{
 			ProjectSession session = LokrLabApi.LokrLabApi.CurrentSession;
@@ -222,18 +228,7 @@ namespace LokrAbilityLab.Projects
 				return session.FolderPath;
 			}
 
-			string first = AbilityLabPaths.FirstLibraryFolder();
-			if (!string.IsNullOrEmpty(first))
-			{
-				return first;
-			}
-
-			AbilityLabPaths.EnsureFoldersExist();
-			string id = AbilityLabPaths.GenerateNewLibraryId("vanilla_imports");
-			string created = AbilityLabPaths.LibraryFolder(id);
-			System.IO.Directory.CreateDirectory(created);
-			AbilityLibrarySession.WriteMarker(created, "Vanilla Imports");
-			return created;
+			return null;
 		}
 
 		private static void BuildDetailBody(AbilityFileModel model)

@@ -204,9 +204,9 @@ namespace LokrAbilityLab.Editor
 
 		private static void OnDeleteClicked()
 		{
-			if (current != null && !string.IsNullOrEmpty(current.Id))
+			if (current != null && !string.IsNullOrEmpty(current.SourceFilePath))
 			{
-				AbilityListPanel.DeleteAbility(current.Id);
+				AbilityListPanel.DeleteAbilityFolder(Path.GetDirectoryName(current.SourceFilePath));
 			}
 
 			current = null;
